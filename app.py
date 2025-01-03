@@ -1,9 +1,9 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import time
 import os
 import threading
-from run_browser_task import run_browser_task  # Import the function to run the browser task
+import asyncio
+from playwright.async_api import async_playwright
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -11,21 +11,51 @@ app = Flask(__name__)
 # Enable CORS for the frontend URL
 CORS(app, resources={r"/submit": {"origins": "https://frontend-253d.onrender.com"}})
 
-# Store fbstate data in memory (this could be saved to a database or file in a real-world scenario)
+# Store fbstate data in memory
 fbstate_storage = []
 
-# Helper function to load cookies into the browser session
-def load_facebook_cookies(page, cookies):
-    for cookie in cookies:
-        cookie_dict = {
-            "name": cookie["key"],
-            "value": cookie["value"],
-            "domain": cookie["domain"],
-            "path": cookie["path"],
-            "secure": False,
-            "httpOnly": False
-        }
-        page.context.addCookies([cookie_dict])
+# Async function to run the Playwright task
+async def run_browser_task(fbstate, post_id, amount, interval):
+    try:
+        async with async_playwright() as playwright:
+            browser = await playwright.chromium.launch(headless=True)
+            context = await browser.new_context()
+
+            # Add Facebook cookies
+            for cookie in fbstate:
+                await context.add_cookies([{
+                    "name": cookie["key"],
+                    "value": cookie["value"],
+                    "domain": cookie["domain"],
+                    "path": cookie["path"]
+                }])
+
+            page = await context.new_page()
+
+            for _ in range(amount):
+                await page.goto(f"https://www.facebook.com/{post_id}")
+                await page.wait_for_selector('div[aria-label="Share"]')
+                share_button = await page.query_selector('div[aria-label="Share"]')
+                if share_button:
+                    await share_button.click()
+                    await page.wait_for_selector('button[aria-label="Post"]')
+                    post_button = await page.query_selector('button[aria-label="Post"]')
+                    if post_button:
+                        await post_button.click()
+                    else:
+                        print("Post button not found.")
+                else:
+                    print("Share button not found.")
+                await asyncio.sleep(interval)  # Wait for the interval before sharing again
+
+            await browser.close()
+
+    except Exception as e:
+        print(f"Error in browser task: {e}")
+
+# Async wrapper for running Playwright tasks
+def start_playwright_task(fbstate, post_id, amount, interval):
+    asyncio.run(run_browser_task(fbstate, post_id, amount, interval))
 
 # Function to handle POST requests
 @app.route('/submit', methods=['POST'])
@@ -41,7 +71,7 @@ def submit():
         if not all([fbstate, url, amount, interval]):
             return jsonify({'error': 'Missing required fields'}), 400
 
-        # Store the fbstate in the storage (this is just an example; you can save it as needed)
+        # Store the fbstate in the storage
         fbstate_storage.append(fbstate)
 
         # Extract post ID from the URL
@@ -73,8 +103,8 @@ def submit():
         if not (1 <= interval <= 60):
             return jsonify({'error': 'Interval must be between 1 and 60'}), 400
 
-        # Start the browser task in a separate thread
-        thread = threading.Thread(target=run_browser_task, args=(fbstate, post_id, amount, interval))
+        # Start the Playwright task in a separate thread
+        thread = threading.Thread(target=start_playwright_task, args=(fbstate, post_id, amount, interval))
         thread.start()
 
         return jsonify({'message': f"Sharing {amount} times with intervals of {interval} seconds started for post ID '{post_id}'."}), 200
