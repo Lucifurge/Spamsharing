@@ -68,3 +68,7 @@ def submit():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+if __name__ == "__main__":
+    # Ensure the app is listening on both IPv4 and IPv6 and is bound to the correct host and port
+    app.run(host='0.0.0.0', port=int(os.getenv('PORT', 5000)), debug=False)
