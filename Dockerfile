@@ -1,6 +1,6 @@
 FROM python:3.9-slim
 
-# Install dependencies for headless Chrome
+# Install basic dependencies and some libraries needed for Chromium
 RUN apt-get update && apt-get install -y \
     wget \
     curl \
@@ -14,9 +14,11 @@ RUN apt-get update && apt-get install -y \
     libx11-xcb1 \
     libnss3-dev \
     libgbm-dev \
-    chromium \
-    && apt-get clean \
-    && echo "Chromium and dependencies installed"
+    --fix-missing \
+    && apt-get clean
+
+# Install Chromium from a different repository if available
+RUN apt-get install -y chromium --no-install-recommends
 
 # Install Python dependencies
 RUN pip install --upgrade pip
