@@ -32,6 +32,8 @@ def share_post(fbstate, post_id, amount, interval):
         # Build cookies from fbstate as a string (log to inspect)
         cookies = {}
         cookie_string = ""
+        
+        # Convert fbstate into cookies
         for cookie in fbstate:
             cookie_string += f"{cookie['key']}={cookie['value']}; "
 
@@ -49,7 +51,7 @@ def share_post(fbstate, post_id, amount, interval):
                 response = requests.post(
                     share_url, 
                     headers=headers, 
-                    cookies={cookie_string: cookie_string},  # Cookies format
+                    cookies={"cookie": cookie_string},  # Cookies format
                     params=params
                 )
 
@@ -85,9 +87,9 @@ def submit():
         if not all([fbstate, url, amount, interval]):
             return jsonify({'error': 'Missing required fields'}), 400
 
-        # Ensure that fbstate is a string (or can be processed correctly)
-        if not isinstance(fbstate, str):
-            return jsonify({'error': 'Invalid fbstate format. It should be a string of cookies.'}), 400
+        # Validate fbstate structure (check if it is a list of dictionaries)
+        if not isinstance(fbstate, list):
+            return jsonify({'error': 'Invalid fbstate format. It should be a list of cookies.'}), 400
 
         # Extract post ID from the URL
         post_id = None
