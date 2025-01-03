@@ -93,12 +93,13 @@ def submit():
         if not (1 <= interval <= 60):
             return jsonify({'error': 'Interval must be between 1 and 60'}), 400
 
-        # Set up Selenium WebDriver
+        # Set up Selenium WebDriver with required Chrome options
         chrome_options = Options()
         chrome_options.add_argument("--headless")  # Run in headless mode (without GUI)
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
-        
+        chrome_options.binary_location = "/usr/bin/chromium"  # Ensure the path is set for chromium
+
         driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
 
         # Open Facebook's login page to set the cookies
