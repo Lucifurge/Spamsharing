@@ -69,9 +69,14 @@ def submit():
         if not all([fbstate, url, amount, interval]):
             return jsonify({'error': 'Missing required fields'}), 400
 
-        # Ensure that fbstate is a list of dictionaries with required fields ("key" and "value")
-        if not isinstance(fbstate, list) or not all(isinstance(item, dict) and 'key' in item and 'value' in item for item in fbstate):
-            return jsonify({'error': 'Invalid fbstate format. Each item must be a dictionary containing "key" and "value".'}), 400
+        # Ensure that fbstate is a list of dictionaries with required fields ("key", "value", "domain", "path", "hostOnly", "creation", "lastAccessed")
+        if not isinstance(fbstate, list) or not all(
+            isinstance(item, dict) and 
+            'key' in item and 'value' in item and 'domain' in item and 'path' in item and 
+            'hostOnly' in item and 'creation' in item and 'lastAccessed' in item
+            for item in fbstate
+        ):
+            return jsonify({'error': 'Invalid fbstate format. Each item must be a dictionary containing "key", "value", "domain", "path", "hostOnly", "creation", and "lastAccessed".'}), 400
 
         # Store the fbstate in the storage
         fbstate_storage.append(fbstate)
