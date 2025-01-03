@@ -1,7 +1,8 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+import os
+app.run(host='0.0.0.0', port=int(os.getenv('PORT', 5000)), debug=False)
 
-app = Flask(__name__)
 
 # Set the app's environment to production
 app.config["ENV"] = "production"
