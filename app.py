@@ -22,7 +22,7 @@ def share_post(fbstate, post_id, amount, interval):
             "Content-Type": "application/x-www-form-urlencoded",
         }
 
-        # Build the cookies from fbstate
+        # Build the cookies from fbstate (using only "key" and "value")
         cookies = {cookie["key"]: cookie["value"] for cookie in fbstate}
 
         for i in range(amount):
