@@ -15,7 +15,8 @@ RUN apt-get update && apt-get install -y \
     libnss3-dev \
     libgbm-dev \
     chromium \
-    && apt-get clean
+    && apt-get clean \
+    && echo "Chromium and dependencies installed"
 
 # Install Python dependencies
 RUN pip install --upgrade pip
