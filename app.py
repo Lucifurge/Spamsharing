@@ -2,8 +2,8 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
 import threading
-import asyncio
-from playwright.async_api import async_playwright
+import requests
+import time
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -14,48 +14,34 @@ CORS(app, resources={r"/submit": {"origins": "https://frontend-253d.onrender.com
 # Store fbstate data in memory
 fbstate_storage = []
 
-# Async function to run the Playwright task
-async def run_browser_task(fbstate, post_id, amount, interval):
+# Function to send share requests to Facebook
+def share_post(fbstate, post_id, amount, interval):
     try:
-        async with async_playwright() as playwright:
-            browser = await playwright.chromium.launch(headless=True)
-            context = await browser.new_context()
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+            "Content-Type": "application/x-www-form-urlencoded",
+        }
 
-            # Add Facebook cookies
-            for cookie in fbstate:
-                await context.add_cookies([{
-                    "name": cookie["key"],
-                    "value": cookie["value"],
-                    "domain": cookie["domain"],
-                    "path": cookie["path"]
-                }])
+        # Build the cookies from fbstate
+        cookies = {cookie["key"]: cookie["value"] for cookie in fbstate}
 
-            page = await context.new_page()
-
-            for _ in range(amount):
-                await page.goto(f"https://www.facebook.com/{post_id}")
-                await page.wait_for_selector('div[aria-label="Share"]')
-                share_button = await page.query_selector('div[aria-label="Share"]')
-                if share_button:
-                    await share_button.click()
-                    await page.wait_for_selector('button[aria-label="Post"]')
-                    post_button = await page.query_selector('button[aria-label="Post"]')
-                    if post_button:
-                        await post_button.click()
-                    else:
-                        print("Post button not found.")
+        for i in range(amount):
+            try:
+                response = requests.post(
+                    f"https://www.facebook.com/{post_id}/share",
+                    headers=headers,
+                    cookies=cookies,
+                )
+                if response.status_code == 200:
+                    print(f"[{i + 1}] Successfully shared post ID: {post_id}")
                 else:
-                    print("Share button not found.")
-                await asyncio.sleep(interval)  # Wait for the interval before sharing again
+                    print(f"[{i + 1}] Failed to share post ID: {post_id}. Status code: {response.status_code}")
+            except Exception as e:
+                print(f"[{i + 1}] Error sharing post: {e}")
 
-            await browser.close()
-
+            time.sleep(interval)
     except Exception as e:
-        print(f"Error in browser task: {e}")
-
-# Async wrapper for running Playwright tasks
-def start_playwright_task(fbstate, post_id, amount, interval):
-    asyncio.run(run_browser_task(fbstate, post_id, amount, interval))
+        print(f"Error in share_post function: {e}")
 
 # Function to handle POST requests
 @app.route('/submit', methods=['POST'])
@@ -77,18 +63,12 @@ def submit():
         # Extract post ID from the URL
         post_id = None
         if url.startswith("https://www.facebook.com/"):
-            if "/posts/" in url:
+            if "/posts/" in url or "/share/p/" in url:
                 parts = url.split("/")
                 try:
                     post_id = parts[5]  # Extract the post ID
                 except IndexError:
-                    return jsonify({'error': 'Malformed Facebook post URL'}), 400
-            elif "/share/p/" in url:
-                parts = url.split("/")
-                try:
-                    post_id = parts[5]  # Extract the post ID
-                except IndexError:
-                    return jsonify({'error': 'Malformed Facebook share URL'}), 400
+                    return jsonify({'error': 'Malformed Facebook URL'}), 400
             else:
                 return jsonify({'error': 'Unsupported Facebook URL format'}), 400
         else:
@@ -103,8 +83,8 @@ def submit():
         if not (1 <= interval <= 60):
             return jsonify({'error': 'Interval must be between 1 and 60'}), 400
 
-        # Start the Playwright task in a separate thread
-        thread = threading.Thread(target=start_playwright_task, args=(fbstate, post_id, amount, interval))
+        # Start the sharing task in a separate thread
+        thread = threading.Thread(target=share_post, args=(fbstate, post_id, amount, interval))
         thread.start()
 
         return jsonify({'message': f"Sharing {amount} times with intervals of {interval} seconds started for post ID '{post_id}'."}), 200
