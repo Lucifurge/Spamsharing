@@ -103,7 +103,7 @@ def submit():
             interval = int(interval)
             if not (1 <= amount <= 1000000):
                 return jsonify({'error': 'Amount must be between 1 and 1 million'}), 400
-            if not (1 <= interval <= 60):
+            if not (0.1 <= interval <= 60):
                 return jsonify({'error': 'Interval must be between 1 and 60'}), 400
         except ValueError:
             return jsonify({'error': 'Amount and interval must be integers'}), 400
