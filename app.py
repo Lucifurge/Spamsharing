@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 from datetime import datetime
 from flask_cors import CORS
+import os
 
 app = Flask(__name__)
 
@@ -46,4 +47,6 @@ def submit():
     return jsonify({'message': result})
 
 if __name__ == '__main__':
-    app.run(debug=False, host='0.0.0.0', port=5000)
+    # Use the PORT environment variable provided by Railway
+    port = int(os.environ.get('PORT', 5000))
+    app.run(debug=False, host='0.0.0.0', port=port)
