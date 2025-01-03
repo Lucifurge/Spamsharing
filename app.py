@@ -86,7 +86,7 @@ def submit():
         if "/posts/" in url:
             post_id = url.split("/posts/")[1].split("?")[0]
         elif "/share/p/" in url:
-            post_id = url.split("/p/")[1].split("?")[0]
+            post_id = url.split("/share/p/")[1].split("/")[0]  # Updated to handle the '/postid/' format
         else:
             return jsonify({'error': 'Unsupported URL format'}), 400
 
