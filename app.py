@@ -96,6 +96,9 @@ def submit():
         # Set up Selenium WebDriver
         chrome_options = Options()
         chrome_options.add_argument("--headless")  # Run in headless mode (without GUI)
+        chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--disable-dev-shm-usage")
+        
         driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
 
         # Open Facebook's login page to set the cookies
