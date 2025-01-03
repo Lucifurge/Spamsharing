@@ -14,18 +14,16 @@ RUN apt-get update && apt-get install -y \
     libx11-xcb1 \
     libnss3-dev \
     libgbm-dev \
+    chromium \
     && apt-get clean
-
-# Install Chromium
-RUN apt-get install -y chromium
 
 # Install Python dependencies
 RUN pip install --upgrade pip
 RUN pip install selenium flask flask-cors webdriver-manager
 
-# Set environment variables
+# Set environment variables for Chromium and Chromedriver
 ENV CHROME_BIN=/usr/bin/chromium
-ENV CHROME_DRIVER=/usr/local/bin/chromedriver
+ENV CHROME_DRIVER=/usr/bin/chromedriver
 
 # Copy your Flask app
 COPY . /app
