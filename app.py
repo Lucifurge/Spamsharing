@@ -3,6 +3,10 @@ from flask_cors import CORS
 
 app = Flask(__name__)
 
+# Set the app's environment to production
+app.config["ENV"] = "production"
+app.config["DEBUG"] = False
+
 # Enable CORS for the frontend URL
 CORS(app, resources={r"/submit": {"origins": "https://frontend-253d.onrender.com"}})
 
@@ -65,4 +69,4 @@ def submit():
         return jsonify({'error': str(e)}), 500
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=False)  # Ensure debug is turned off
