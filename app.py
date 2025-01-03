@@ -1,8 +1,8 @@
 from flask import Flask, request, jsonify
 from pyppeteer import launch
 from flask_cors import CORS
-import time
 import os
+import asyncio
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -14,7 +14,7 @@ CORS(app, resources={r"/submit": {"origins": "https://frontend-253d.onrender.com
 fbstate_storage = []
 
 # Helper function to load cookies into the browser session
-def load_facebook_cookies(page, cookies):
+async def load_facebook_cookies(page, cookies):
     for cookie in cookies:
         cookie_dict = {
             "name": cookie["key"],
@@ -24,7 +24,7 @@ def load_facebook_cookies(page, cookies):
             "secure": False,
             "httpOnly": False
         }
-        page.context.addCookies([cookie_dict])
+        await page.context.add_cookies([cookie_dict])
 
 # Function to perform the sharing action on Facebook
 async def share_post(page, post_id):
@@ -35,7 +35,7 @@ async def share_post(page, post_id):
     await page.waitForSelector('button[aria-label="Post"]')  # Ensure post button is loaded
     post_button = await page.querySelector('button[aria-label="Post"]')
     await post_button.click()
-    time.sleep(5)  # Wait for the post to be shared
+    await asyncio.sleep(5)  # Wait for the post to be shared
 
 # Define the route to handle the submission from the frontend
 @app.route('/submit', methods=['POST'])
@@ -89,15 +89,15 @@ async def submit():
 
         # Open Facebook and load cookies into the browser session
         await page.goto("https://www.facebook.com")
-        time.sleep(3)  # Allow time for the page to load
-        load_facebook_cookies(page, fbstate)
+        await asyncio.sleep(3)  # Allow time for the page to load
+        await load_facebook_cookies(page, fbstate)
         await page.reload()
-        time.sleep(5)  # Wait for the session to be established
+        await asyncio.sleep(5)  # Wait for the session to be established
 
         # Simulate the share action multiple times with the specified interval
         for i in range(amount):
             await share_post(page, post_id)
-            time.sleep(interval)
+            await asyncio.sleep(interval)  # Use async sleep
 
         await browser.close()
 
