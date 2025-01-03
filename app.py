@@ -22,27 +22,25 @@ def share_post(fbstate, post_id, amount, interval):
             "Content-Type": "application/x-www-form-urlencoded",
         }
 
-        # Build the cookies from fbstate and include all fields
+        # Build the cookies from fbstate as a string
         cookies = {}
+        cookie_string = ""
         for cookie in fbstate:
-            cookies[cookie["key"]] = {
-                "value": cookie["value"],
-                "domain": cookie.get("domain"),
-                "path": cookie.get("path"),
-                "hostOnly": cookie.get("hostOnly"),
-                "creation": cookie.get("creation"),
-                "lastAccessed": cookie.get("lastAccessed")
-            }
+            # Assuming the fbstate is now a string, concatenate key-value pairs
+            cookie_string += f"{cookie['key']}={cookie['value']}; "
+
+        # Clean up the trailing semicolon and space
+        cookie_string = cookie_string.strip("; ")
 
         for i in range(amount):
             try:
                 # Ensure the URL and cookies are correctly handled
                 share_url = f"https://www.facebook.com/{post_id}/share"
-                print(f"Attempting to share post: {share_url} with cookies: {cookies}")
+                print(f"Attempting to share post: {share_url} with cookies: {cookie_string}")
                 response = requests.post(
                     share_url,
                     headers=headers,
-                    cookies=cookies,
+                    cookies={cookie_string: cookie_string},  # Pass cookies as a string
                 )
                 if response.status_code == 200:
                     print(f"[{i + 1}] Successfully shared post ID: {post_id}")
@@ -69,16 +67,11 @@ def submit():
         if not all([fbstate, url, amount, interval]):
             return jsonify({'error': 'Missing required fields'}), 400
 
-        # Ensure that fbstate is a list of dictionaries with required fields ("key", "value", "domain", "path", "hostOnly", "creation", "lastAccessed")
-        if not isinstance(fbstate, list) or not all(
-            isinstance(item, dict) and 
-            'key' in item and 'value' in item and 'domain' in item and 'path' in item and 
-            'hostOnly' in item and 'creation' in item and 'lastAccessed' in item
-            for item in fbstate
-        ):
-            return jsonify({'error': 'Invalid fbstate format. Each item must be a dictionary containing "key", "value", "domain", "path", "hostOnly", "creation", and "lastAccessed".'}), 400
+        # Ensure that fbstate is a string (as you requested)
+        if not isinstance(fbstate, str):
+            return jsonify({'error': 'Invalid fbstate format. It should be a string of cookies.'}), 400
 
-        # Store the fbstate in the storage
+        # Store the fbstate in the storage (as a string now)
         fbstate_storage.append(fbstate)
 
         # Extract post ID from the URL
