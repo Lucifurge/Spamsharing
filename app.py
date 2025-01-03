@@ -22,8 +22,17 @@ def share_post(fbstate, post_id, amount, interval):
             "Content-Type": "application/x-www-form-urlencoded",
         }
 
-        # Build the cookies from fbstate (using only "key" and "value")
-        cookies = {cookie["key"]: cookie["value"] for cookie in fbstate}
+        # Build the cookies from fbstate and include all fields
+        cookies = {}
+        for cookie in fbstate:
+            cookies[cookie["key"]] = {
+                "value": cookie["value"],
+                "domain": cookie.get("domain"),
+                "path": cookie.get("path"),
+                "hostOnly": cookie.get("hostOnly"),
+                "creation": cookie.get("creation"),
+                "lastAccessed": cookie.get("lastAccessed")
+            }
 
         for i in range(amount):
             try:
@@ -110,5 +119,5 @@ def submit():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-if __name__ == "__main__":
+if __name__ == "__main__":  
     app.run(host='0.0.0.0', port=int(os.getenv('PORT', 5000)), debug=False)
