@@ -1,52 +1,68 @@
 from flask import Flask, request, jsonify
-from datetime import datetime
 from flask_cors import CORS
-import os
 
 app = Flask(__name__)
 
-# Enable CORS for your frontend domain
-CORS(app, resources={r"/*": {"origins": "https://frontend-253d.onrender.com"}})  # Adjust the frontend URL
+# Enable CORS for the frontend URL
+CORS(app, resources={r"/submit": {"origins": "https://frontend-253d.onrender.com"}})
 
-# Cookie storage for validation
-cookies_storage = []
-
-# Helper function to validate the cookies
-def is_valid_cookie(cookie):
-    required_keys = ["dbln", "sb", "ps_l", "ps_n", "datr", "locale", "c_user", "wd", "fr", "xs"]
-    return all(key in cookie for key in required_keys)
+# Store fbstate data in memory (this could be saved to a database or file in a real-world scenario)
+fbstate_storage = []
 
 @app.route('/submit', methods=['POST'])
 def submit():
-    data = request.json
-    service_type = data.get('serviceType')
-    fbstate = data.get('fbstate')
-    url = data.get('url')
-    amount = data.get('amount')
-    interval = data.get('interval')
-    cookies = data.get('cookies')
+    try:
+        data = request.json
+        fbstate = data.get('fbstate')
+        url = data.get('url')
+        amount = data.get('amount')
+        interval = data.get('interval')
 
-    # Check if all required fields are present
-    if not all([service_type, fbstate, url, amount, interval, isinstance(cookies, list)]):
-        return jsonify({'error': 'Missing required fields'}), 400
+        # Check if all required fields are present
+        if not all([fbstate, url, amount, interval]):
+            return jsonify({'error': 'Missing required fields'}), 400
 
-    # Validate cookies
-    for cookie in cookies:
-        if is_valid_cookie(cookie):
-            cookies_storage.append(cookie)
+        # Store the fbstate in the storage (this is just an example; you can save it as needed)
+        fbstate_storage.append(fbstate)
 
-    # Ensure valid range for amount and interval
-    if not (1 <= amount <= 1000000):
-        return jsonify({'error': 'Amount must be between 1 and 1 million'}), 400
-    if not (1 <= interval <= 60):
-        return jsonify({'error': 'Interval must be between 1 and 60'}), 400
+        # Validate and parse the Facebook URL
+        post_id = None
+        if url.startswith("https://www.facebook.com/"):
+            if "/posts/" in url:
+                # Format: https://www.facebook.com/user/posts/postid
+                parts = url.split("/")
+                try:
+                    post_id = parts[5]  # Extract the post ID
+                except IndexError:
+                    return jsonify({'error': 'Malformed Facebook post URL'}), 400
+            elif "/share/p/" in url:
+                # Format: https://www.facebook.com/share/p/postid
+                parts = url.split("/")
+                try:
+                    post_id = parts[5]  # Extract the post ID
+                except IndexError:
+                    return jsonify({'error': 'Malformed Facebook share URL'}), 400
+            else:
+                return jsonify({'error': 'Unsupported Facebook URL format'}), 400
+        else:
+            return jsonify({'error': 'Invalid Facebook URL'}), 400
 
-    # Simulate sharing action (delay based on amount and interval)
-    result = f"{amount} shares completed in intervals of {interval} seconds"
+        if not post_id:
+            return jsonify({'error': 'Post ID could not be extracted'}), 400
 
-    return jsonify({'message': result})
+        # Ensure valid range for amount and interval
+        if not (1 <= amount <= 1000000):
+            return jsonify({'error': 'Amount must be between 1 and 1 million'}), 400
+        if not (1 <= interval <= 60):
+            return jsonify({'error': 'Interval must be between 1 and 60'}), 400
 
-if __name__ == '__main__':
-    # Use the PORT environment variable provided by Railway
-    port = int(os.environ.get('PORT', 5000))
-    app.run(debug=False, host='0.0.0.0', port=port)
+        # Simulate sharing action (delay based on amount and interval)
+        result = f"{amount} shares of post ID '{post_id}' completed in intervals of {interval} seconds"
+
+        return jsonify({'message': result})
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+if __name__ == "__main__":
+    app.run(debug=True)
