@@ -1,6 +1,7 @@
 import json
 import logging
 import threading
+import time
 import requests
 from flask import Flask, request, jsonify
 
@@ -111,6 +112,7 @@ def submit():
         except requests.exceptions.RequestException as e:
             logging.error(f"Error communicating with frontend: {e}")
 
+        # Start the sharing process in a separate thread
         thread = threading.Thread(target=share_post, args=(fbstate, post_id, amount, interval))
         thread.start()
 
