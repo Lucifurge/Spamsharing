@@ -1,8 +1,8 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
-app.run(host='0.0.0.0', port=int(os.getenv('PORT', 5000)), debug=False)
 
+app = Flask(__name__)
 
 # Set the app's environment to production
 app.config["ENV"] = "production"
@@ -70,4 +70,4 @@ def submit():
         return jsonify({'error': str(e)}), 500
 
 if __name__ == "__main__":
-    app.run(debug=False)  # Ensure debug is turned off
+    app.run(host='0.0.0.0', port=int(os.getenv('PORT', 5000)), debug=False)  # Ensure correct app.run() position
