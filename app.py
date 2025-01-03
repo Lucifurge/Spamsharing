@@ -48,7 +48,7 @@ def submit():
             if not (1 <= amount <= 1000000):
                 return jsonify({'error': 'Amount must be between 1 and 1 million'}), 400
             if not (0.1 <= interval <= 60):
-                return jsonify({'error': 'Interval must be between 0.1 and 60 seconds'}), 400
+                return jsonify({'error': 'Interval must be between 1 and 60 seconds'}), 400
         except ValueError:
             return jsonify({'error': 'Amount must be an integer and interval must be a float'}), 400
 
