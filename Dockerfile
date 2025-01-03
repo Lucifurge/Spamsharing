@@ -1,7 +1,9 @@
 FROM python:3.9-slim
 
-# Install basic dependencies and some libraries needed for Chromium
-RUN apt-get update && apt-get install -y \
+# Install dependencies for headless Chrome
+RUN apt-get update && \
+    apt-get upgrade -y && \  # Upgrade all existing packages
+    apt-get install -y \
     wget \
     curl \
     unzip \
@@ -14,19 +16,18 @@ RUN apt-get update && apt-get install -y \
     libx11-xcb1 \
     libnss3-dev \
     libgbm-dev \
-    --fix-missing \
-    && apt-get clean
-
-# Install Chromium from a different repository if available
-RUN apt-get install -y chromium --no-install-recommends
+    chromium \
+    --fix-missing && \  # Ensure any missing dependencies are fetched
+    apt-get clean && \  # Clean up to reduce image size
+    echo "Chromium and dependencies installed"
 
 # Install Python dependencies
 RUN pip install --upgrade pip
 RUN pip install selenium flask flask-cors webdriver-manager
 
-# Set environment variables for Chromium and Chromedriver
+# Set environment variables for Chromium and ChromeDriver
 ENV CHROME_BIN=/usr/bin/chromium
-ENV CHROME_DRIVER=/usr/bin/chromedriver
+ENV CHROME_DRIVER=/usr/local/bin/chromedriver
 
 # Copy your Flask app
 COPY . /app
