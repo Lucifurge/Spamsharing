@@ -60,7 +60,7 @@ def submit():
         if not all([fbstate, url, amount, interval]):
             return jsonify({'error': 'Missing required fields'}), 400
 
-        # Ensure that fbstate is a list of dictionaries with required fields
+        # Ensure that fbstate is a list of dictionaries with required fields ("key" and "value")
         if not isinstance(fbstate, list) or not all(isinstance(item, dict) and 'key' in item and 'value' in item for item in fbstate):
             return jsonify({'error': 'Invalid fbstate format. Each item must be a dictionary containing "key" and "value".'}), 400
 
@@ -70,16 +70,22 @@ def submit():
         # Extract post ID from the URL
         post_id = None
         if url.startswith("https://www.facebook.com/"):
-            if "/posts/" in url or "/share/p/" in url:
+            if "/posts/" in url:
                 parts = url.split("/")
                 try:
-                    post_id = parts[5]  # Extract the post ID
+                    post_id = parts[parts.index("posts") + 1]  # Extract the post ID from the correct part
                 except IndexError:
-                    return jsonify({'error': 'Malformed Facebook URL'}), 400
+                    return jsonify({'error': 'Malformed Facebook URL, unable to extract post ID.'}), 400
+            elif "/share/p/" in url:
+                parts = url.split("/")
+                try:
+                    post_id = parts[parts.index("p") + 1]  # Extract the post ID from share URL
+                except IndexError:
+                    return jsonify({'error': 'Malformed Facebook URL, unable to extract post ID.'}), 400
             else:
                 return jsonify({'error': 'Unsupported Facebook URL format'}), 400
         else:
-            return jsonify({'error': 'Invalid Facebook URL'}), 400
+            return jsonify({'error': 'Invalid Facebook URL format'}), 400
 
         if not post_id:
             return jsonify({'error': 'Post ID could not be extracted'}), 400
