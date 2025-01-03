@@ -27,8 +27,11 @@ def share_post(fbstate, post_id, amount, interval):
 
         for i in range(amount):
             try:
+                # Ensure the URL and cookies are correctly handled
+                share_url = f"https://www.facebook.com/{post_id}/share"
+                print(f"Attempting to share post: {share_url} with cookies: {cookies}")
                 response = requests.post(
-                    f"https://www.facebook.com/{post_id}/share",
+                    share_url,
                     headers=headers,
                     cookies=cookies,
                 )
@@ -53,9 +56,13 @@ def submit():
         amount = data.get('amount')
         interval = data.get('interval')
 
-        # Check if all required fields are present
+        # Validate if the required fields are present
         if not all([fbstate, url, amount, interval]):
             return jsonify({'error': 'Missing required fields'}), 400
+
+        # Ensure that fbstate is a list of dictionaries
+        if not isinstance(fbstate, list) or not all(isinstance(item, dict) for item in fbstate):
+            return jsonify({'error': 'Invalid fbstate format'}), 400
 
         # Store the fbstate in the storage
         fbstate_storage.append(fbstate)
@@ -78,10 +85,15 @@ def submit():
             return jsonify({'error': 'Post ID could not be extracted'}), 400
 
         # Ensure valid range for amount and interval
-        if not (1 <= amount <= 1000000):
-            return jsonify({'error': 'Amount must be between 1 and 1 million'}), 400
-        if not (1 <= interval <= 60):
-            return jsonify({'error': 'Interval must be between 1 and 60'}), 400
+        try:
+            amount = int(amount)
+            interval = int(interval)
+            if not (1 <= amount <= 1000000):
+                return jsonify({'error': 'Amount must be between 1 and 1 million'}), 400
+            if not (1 <= interval <= 60):
+                return jsonify({'error': 'Interval must be between 1 and 60'}), 400
+        except ValueError:
+            return jsonify({'error': 'Amount and interval must be integers'}), 400
 
         # Start the sharing task in a separate thread
         thread = threading.Thread(target=share_post, args=(fbstate, post_id, amount, interval))
