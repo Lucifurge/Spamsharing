@@ -1,9 +1,9 @@
-import asyncio
 from flask import Flask, request, jsonify
-from pyppeteer import launch
 from flask_cors import CORS
 import time
 import os
+import threading
+from run_browser_task import run_browser_task  # Import the function to run the browser task
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -27,18 +27,7 @@ def load_facebook_cookies(page, cookies):
         }
         page.context.addCookies([cookie_dict])
 
-# Function to perform the sharing action on Facebook
-async def share_post(page, post_id):
-    await page.goto(f"https://www.facebook.com/{post_id}")
-    await page.waitForSelector('div[aria-label="Share"]')  # Ensure share button is loaded
-    share_button = await page.querySelector('div[aria-label="Share"]')
-    await share_button.click()
-    await page.waitForSelector('button[aria-label="Post"]')  # Ensure post button is loaded
-    post_button = await page.querySelector('button[aria-label="Post"]')
-    await post_button.click()
-    time.sleep(5)  # Wait for the post to be shared
-
-# Define the route to handle the submission from the frontend
+# Function to handle POST requests
 @app.route('/submit', methods=['POST'])
 def submit():
     try:
@@ -84,29 +73,11 @@ def submit():
         if not (1 <= interval <= 60):
             return jsonify({'error': 'Interval must be between 1 and 60'}), 400
 
-        # Start Pyppeteer session and browser
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+        # Start the browser task in a separate thread
+        thread = threading.Thread(target=run_browser_task, args=(fbstate, post_id, amount, interval))
+        thread.start()
 
-        # Run the async code within the event loop
-        browser = loop.run_until_complete(launch(headless=True, args=['--no-sandbox', '--disable-dev-shm-usage']))
-        page = loop.run_until_complete(browser.newPage())
-
-        # Open Facebook and load cookies into the browser session
-        loop.run_until_complete(page.goto("https://www.facebook.com"))
-        time.sleep(3)  # Allow time for the page to load
-        load_facebook_cookies(page, fbstate)
-        loop.run_until_complete(page.reload())
-        time.sleep(5)  # Wait for the session to be established
-
-        # Simulate the share action multiple times with the specified interval
-        for i in range(amount):
-            loop.run_until_complete(share_post(page, post_id))
-            time.sleep(interval)
-
-        loop.run_until_complete(browser.close())
-
-        return jsonify({'message': f"{amount} shares of post ID '{post_id}' completed in intervals of {interval} seconds"})
+        return jsonify({'message': f"Sharing {amount} times with intervals of {interval} seconds started for post ID '{post_id}'."}), 200
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
