@@ -11,10 +11,10 @@ app = Flask(__name__)
 # Enable CORS for the frontend URL
 CORS(app, resources={r"/submit": {"origins": "https://frontend-253d.onrender.com"}})
 
-# Store fbstate data in memory
-fbstate_storage = []
+# Facebook credentials (Access token and App details)
+ACCESS_TOKEN = "EAAOJZBiWW8UUBO8x7QEXkM6j0LlhM57pMhbHfBMsCnJcg6Pnqqi9GdKBpjWI8ZAhADM20lzS8UQLLTBTtOqMw2qmnHy9W0oeAFMJZCIhPRDhhHwZBkwZAud7H5Fql2GyZA4il7FpL0ZC9py8tTOxumZCQPm2nzmyh8aZAQyDt3agPl6XOowlvHV4NFh3c5p0a9WHg1hNguPHF6SyweA7jGptXtfz1pN4ZD"
 
-# Function to send share requests to Facebook
+# Function to send share requests to Facebook using the access token
 def share_post(fbstate, post_id, amount, interval):
     try:
         headers = {
@@ -22,26 +22,30 @@ def share_post(fbstate, post_id, amount, interval):
             "Content-Type": "application/x-www-form-urlencoded",
         }
 
-        # Build the cookies from fbstate as a string
+        # Build the cookies from fbstate as a string (still using fbstate for any session or cookie data)
         cookies = {}
         cookie_string = ""
         for cookie in fbstate:
-            # Assuming the fbstate is now a string, concatenate key-value pairs
             cookie_string += f"{cookie['key']}={cookie['value']}; "
 
-        # Clean up the trailing semicolon and space
         cookie_string = cookie_string.strip("; ")
 
         for i in range(amount):
             try:
-                # Ensure the URL and cookies are correctly handled
-                share_url = f"https://www.facebook.com/{post_id}/share"
-                print(f"Attempting to share post: {share_url} with cookies: {cookie_string}")
+                # Use Facebook's Graph API with the provided post_id and the long-lived access token
+                share_url = f"https://graph.facebook.com/v14.0/{post_id}/shares"
+                params = {
+                    'access_token': ACCESS_TOKEN  # Use the provided long-lived access token
+                }
+
+                # You can still use fbstate to maintain session and cookie info for the request
                 response = requests.post(
-                    share_url,
-                    headers=headers,
-                    cookies={cookie_string: cookie_string},  # Pass cookies as a string
+                    share_url, 
+                    headers=headers, 
+                    cookies={cookie_string: cookie_string},  # Use the fbstate cookie string here
+                    params=params
                 )
+
                 if response.status_code == 200:
                     print(f"[{i + 1}] Successfully shared post ID: {post_id}")
                 else:
@@ -58,7 +62,7 @@ def share_post(fbstate, post_id, amount, interval):
 def submit():
     try:
         data = request.json
-        fbstate = data.get('fbstate')
+        fbstate = data.get('fbstate')  # fbstate provided by the user
         url = data.get('url')
         amount = data.get('amount')
         interval = data.get('interval')
@@ -67,12 +71,9 @@ def submit():
         if not all([fbstate, url, amount, interval]):
             return jsonify({'error': 'Missing required fields'}), 400
 
-        # Ensure that fbstate is a string (as you requested)
+        # Ensure that fbstate is a string (or can be processed correctly)
         if not isinstance(fbstate, str):
             return jsonify({'error': 'Invalid fbstate format. It should be a string of cookies.'}), 400
-
-        # Store the fbstate in the storage (as a string now)
-        fbstate_storage.append(fbstate)
 
         # Extract post ID from the URL
         post_id = None
