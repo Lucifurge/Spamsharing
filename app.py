@@ -67,18 +67,24 @@ def submit():
         data = request.json
         logging.debug(f"Received data from frontend: {data}")
 
+        # Validate that fbstate is a list of valid cookies
         fbstate = data.get('fbstate')
+        if not isinstance(fbstate, list) or not all(isinstance(cookie, dict) for cookie in fbstate):
+            return jsonify({'error': 'Invalid fbstate format. It should be a list of cookies.'}), 400
+
+        # Validate each cookie structure
+        required_keys = {"key", "value", "domain", "path", "hostOnly", "creation", "lastAccessed"}
+        for cookie in fbstate:
+            if not all(key in cookie for key in required_keys):
+                return jsonify({'error': f"Invalid cookie structure: {cookie}"}), 400
+
+        # Process additional fields
         url = data.get('url')
         amount = data.get('amount')
         interval = data.get('interval')
 
-        # Validate required fields
-        if not all([fbstate, url, amount, interval]):
+        if not all([url, amount, interval]):
             return jsonify({'error': 'Missing required fields'}), 400
-
-        # Validate fbstate format
-        if not isinstance(fbstate, list) or not all(isinstance(cookie, dict) for cookie in fbstate):
-            return jsonify({'error': 'Invalid fbstate format. It should be a list of cookies.'}), 400
 
         # Extract post ID from the URL
         post_id = None
