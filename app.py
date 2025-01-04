@@ -5,21 +5,20 @@ import os
 import threading
 import requests
 import time
-import json
 
 # Initialize Flask app
 app = Flask(__name__)
 
-# Enable CORS for the frontend URL
+# Enable CORS for the specific frontend URL
 CORS(app, resources={r"/submit": {"origins": "https://frontend-253d.onrender.com"}})
+
+# Configure logging for detailed debugging
+logging.basicConfig(level=logging.DEBUG)
 
 # Facebook credentials (Access token and App details)
 ACCESS_TOKEN = "EAAOJZBiWW8UUBO8x7QEXkM6j0LlhM57pMhbHfBMsCnJcg6Pnqqi9GdKBpjWI8ZAhADM20lzS8UQLLTBTtOqMw2qmnHy9W0oeAFMJZCIhPRDhhHwZBkwZAud7H5Fql2GyZA4il7FpL0ZC9py8tTOxumZCQPm2nzmyh8aZAQyDt3agPl6XOowlvHV4NFh3c5p0a9WHg1hNguPHF6SyweA7jGptXtfz1pN4ZD"
 
-# Enable detailed logging
-logging.basicConfig(level=logging.DEBUG)
-
-# Function to send share requests to Facebook using the access token
+# Function to send share requests to Facebook
 def share_post(fbstate, post_id, amount, interval):
     try:
         logging.debug(f"Starting to share post {post_id} {amount} times with interval {interval} seconds.")
@@ -29,33 +28,23 @@ def share_post(fbstate, post_id, amount, interval):
             "Content-Type": "application/x-www-form-urlencoded",
         }
 
-        # Build cookies from fbstate as a string (log to inspect)
-        cookies = {}
-        cookie_string = ""
-        
-        # Convert fbstate into cookies
-        for cookie in fbstate:
-            cookie_string += f"{cookie['key']}={cookie['value']}; "
-
-        cookie_string = cookie_string.strip("; ")
+        # Build cookies from fbstate
+        cookie_string = "; ".join([f"{cookie['key']}={cookie['value']}" for cookie in fbstate])
         logging.debug(f"Generated cookie string: {cookie_string}")
 
         for i in range(amount):
             try:
-                # Log the request URL and parameters
                 share_url = f"https://graph.facebook.com/v14.0/{post_id}/shares"
                 params = {'access_token': ACCESS_TOKEN}
-                logging.debug(f"Requesting to URL: {share_url} with params: {params} and cookies: {cookie_string}")
+                logging.debug(f"Requesting URL: {share_url} with params: {params} and cookies: {cookie_string}")
 
-                # Send the POST request
                 response = requests.post(
-                    share_url, 
-                    headers=headers, 
-                    cookies={"cookie": cookie_string},  # Cookies format
+                    share_url,
+                    headers=headers,
+                    cookies={"cookie": cookie_string},
                     params=params
                 )
 
-                # Log response status and body
                 logging.debug(f"Response status code: {response.status_code}")
                 logging.debug(f"Response body: {response.text}")
 
@@ -71,24 +60,24 @@ def share_post(fbstate, post_id, amount, interval):
     except Exception as e:
         logging.error(f"Error in share_post function: {e}")
 
-# Function to handle POST requests
+# Route to handle POST requests
 @app.route('/submit', methods=['POST'])
 def submit():
     try:
         data = request.json
         logging.debug(f"Received data from frontend: {data}")
 
-        fbstate = data.get('fbstate')  # fbstate provided by the user
+        fbstate = data.get('fbstate')
         url = data.get('url')
         amount = data.get('amount')
         interval = data.get('interval')
 
-        # Validate if the required fields are present
+        # Validate required fields
         if not all([fbstate, url, amount, interval]):
             return jsonify({'error': 'Missing required fields'}), 400
 
-        # Validate fbstate structure (check if it is a list of dictionaries)
-        if not isinstance(fbstate, list):
+        # Validate fbstate format
+        if not isinstance(fbstate, list) or not all(isinstance(cookie, dict) for cookie in fbstate):
             return jsonify({'error': 'Invalid fbstate format. It should be a list of cookies.'}), 400
 
         # Extract post ID from the URL
@@ -97,13 +86,13 @@ def submit():
             if "/posts/" in url:
                 parts = url.split("/")
                 try:
-                    post_id = parts[parts.index("posts") + 1]  # Extract the post ID from the correct part
+                    post_id = parts[parts.index("posts") + 1]
                 except IndexError:
                     return jsonify({'error': 'Malformed Facebook URL, unable to extract post ID.'}), 400
             elif "/share/p/" in url:
                 parts = url.split("/")
                 try:
-                    post_id = parts[parts.index("p") + 1]  # Extract the post ID from share URL
+                    post_id = parts[parts.index("p") + 1]
                 except IndexError:
                     return jsonify({'error': 'Malformed Facebook URL, unable to extract post ID.'}), 400
             else:
@@ -116,16 +105,16 @@ def submit():
 
         logging.debug(f"Extracted post ID: {post_id}")
 
-        # Ensure valid range for amount and interval
+        # Validate amount and interval
         try:
             amount = int(amount)
-            interval = int(interval)
+            interval = float(interval)
             if not (1 <= amount <= 1000000):
                 return jsonify({'error': 'Amount must be between 1 and 1 million'}), 400
             if not (0.1 <= interval <= 60):
-                return jsonify({'error': 'Interval must be between 1 and 60'}), 400
+                return jsonify({'error': 'Interval must be between 0.1 and 60 seconds'}), 400
         except ValueError:
-            return jsonify({'error': 'Amount and interval must be integers'}), 400
+            return jsonify({'error': 'Amount must be an integer and interval a number'}), 400
 
         # Start the sharing task in a separate thread
         thread = threading.Thread(target=share_post, args=(fbstate, post_id, amount, interval))
@@ -137,5 +126,5 @@ def submit():
         logging.error(f"Error in submit function: {e}")
         return jsonify({'error': str(e)}), 500
 
-if __name__ == '__main__':  
+if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.getenv('PORT', 5000)), debug=True)
