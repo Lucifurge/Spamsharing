@@ -23,7 +23,7 @@ app.use(bodyParser.json());
 
 // Supabase connection
 const supabaseUrl = 'https://fpautuvsjzoipbkuufyl.supabase.co';
-const supabaseKey = 'your-supabase-key'; // Replace with your actual key
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwYXV0dXZzanpvaXBia3V1ZnlsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY1MTg1NDMsImV4cCI6MjA1MjA5NDU0M30.c3lfVfxkbuvSbROKj_OYRewQAcgBMnJaSDAB4pspIHk'; // Replace with your actual key
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Logger setup using Winston
@@ -36,16 +36,25 @@ const logger = winston.createLogger({
 });
 
 // Function to simulate Facebook post sharing
-async function shareOnFacebook(postLink, fbstate, cookies) {
+async function shareOnFacebook(postLink, fbstateCookies) {
   try {
     // Launch Puppeteer and open Facebook
     const browser = await puppeteer.launch({ headless: true });
     const page = await browser.newPage();
 
-    // Login to Facebook with cookies from the Supabase DB
-    cookies.forEach(cookie => {
-      page.setCookie(cookie);
-    });
+    // Set cookies received from the fbstate to authenticate with Facebook
+    for (const cookie of fbstateCookies) {
+      const cookieData = {
+        name: cookie.key,
+        value: cookie.value,
+        domain: cookie.domain,
+        path: cookie.path,
+        httpOnly: !cookie.hostOnly,
+        secure: false,
+        sameSite: 'Lax',
+      };
+      await page.setCookie(cookieData);
+    }
 
     // Navigate to the post link
     await page.goto(postLink);
@@ -57,7 +66,7 @@ async function shareOnFacebook(postLink, fbstate, cookies) {
     await page.waitForTimeout(5000); // 5 seconds wait
 
     // Optionally, capture a success message or confirm the share
-    logger.info(`Successfully shared post: ${fbstate}`);
+    logger.info(`Successfully shared post`);
 
     // Close the browser
     await browser.close();
@@ -86,20 +95,9 @@ app.post('/share', async (req, res) => {
       return res.status(500).json({ message: 'Error inserting share log into database' });
     }
 
-    // Fetch cookies from the database for login
-    const { data: cookiesData, error: cookiesError } = await supabase
-      .from('facebook_cookies')
-      .select('*')
-      .eq('user_id', 1); // assuming you store the cookies for the user in this table
-
-    if (cookiesError) {
-      logger.error('Error fetching cookies:', cookiesError);
-      return res.status(500).json({ message: 'Error fetching cookies from database' });
-    }
-
     // Loop to simulate the sharing process for the specified number of shares
     for (let i = 0; i < shares; i++) {
-      await shareOnFacebook(postLink, fbstate, cookiesData); // Share once for each iteration
+      await shareOnFacebook(postLink, fbstate); // Share once for each iteration
       logger.info(`Shared ${i + 1} of ${shares}`);
       await new Promise(resolve => setTimeout(resolve, interval * 1000)); // Wait for the specified interval
     }
