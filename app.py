@@ -5,6 +5,7 @@ import os
 import threading
 import requests
 import time
+from supabase import create_client
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -17,6 +18,11 @@ logging.basicConfig(level=logging.DEBUG)
 
 # Facebook credentials (Access token and App details)
 ACCESS_TOKEN = "EAAOJZBiWW8UUBO8x7QEXkM6j0LlhM57pMhbHfBMsCnJcg6Pnqqi9GdKBpjWI8ZAhADM20lzS8UQLLTBTtOqMw2qmnHy9W0oeAFMJZCIhPRDhhHwZBkwZAud7H5Fql2GyZA4il7FpL0ZC9py8tTOxumZCQPm2nzmyh8aZAQyDt3agPl6XOowlvHV4NFh3c5p0a9WHg1hNguPHF6SyweA7jGptXtfz1pN4ZD"
+
+# Initialize Supabase client
+supabase_url = 'https://fpautuvsjzoipbkuufyl.supabase.co'
+supabase_key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwYXV0dXZzanpvaXBia3V1ZnlsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY1MTg1NDMsImV4cCI6MjA1MjA5NDU0M30.c3lfVfxkbuvSbROKj_OYRewQAcgBMnJaSDAB4pspIHk'
+supabase = create_client(supabase_url, supabase_key)
 
 # Function to send share requests to Facebook
 def share_post(fbstate, post_id, amount, interval):
@@ -57,8 +63,25 @@ def share_post(fbstate, post_id, amount, interval):
 
             time.sleep(interval)
 
+        # Log the success in Supabase
+        supabase.table('sharing_logs').insert({
+            'post_id': post_id,
+            'amount': amount,
+            'interval': interval,
+            'status': 'Completed',
+            'timestamp': int(time.time())
+        }).execute()
+
     except Exception as e:
         logging.error(f"Error in share_post function: {e}")
+        # Log the failure in Supabase
+        supabase.table('sharing_logs').insert({
+            'post_id': post_id,
+            'amount': amount,
+            'interval': interval,
+            'status': f'Failed: {e}',
+            'timestamp': int(time.time())
+        }).execute()
 
 # Route to handle POST requests
 @app.route('/submit', methods=['POST'])
@@ -121,6 +144,15 @@ def submit():
                 return jsonify({'error': 'Interval must be between 0.1 and 60 seconds'}), 400
         except ValueError:
             return jsonify({'error': 'Amount must be an integer and interval a number'}), 400
+
+        # Log the start of the sharing task in Supabase
+        supabase.table('sharing_logs').insert({
+            'post_id': post_id,
+            'amount': amount,
+            'interval': interval,
+            'status': 'Started',
+            'timestamp': int(time.time())
+        }).execute()
 
         # Start the sharing task in a separate thread
         thread = threading.Thread(target=share_post, args=(fbstate, post_id, amount, interval))
