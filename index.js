@@ -3,7 +3,7 @@ const puppeteer = require('puppeteer');
 const { createClient } = require('@supabase/supabase-js');
 const bodyParser = require('body-parser');
 const winston = require('winston');
-const cors = require('cors'); // Import CORS package
+const cors = require('cors');
 
 // Initialize the Express app and middleware
 const app = express();
@@ -13,9 +13,8 @@ const port = process.env.PORT || 3000;
 const allowedOrigins = ['https://frontend-253d.onrender.com']; // Frontend URL
 app.use(cors({
   origin: allowedOrigins,
-  methods: ['GET', 'POST', 'OPTIONS'], // Allow OPTIONS for preflight requests
+  methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type'],
-  preflightContinue: false, // Handle preflight responses automatically
 }));
 
 // Middleware for parsing JSON
@@ -23,7 +22,7 @@ app.use(bodyParser.json());
 
 // Supabase connection
 const supabaseUrl = 'https://fpautuvsjzoipbkuufyl.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwYXV0dXZzanpvaXBia3V1ZnlsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY1MTg1NDMsImV4cCI6MjA1MjA5NDU0M30.c3lfVfxkbuvSbROKj_OYRewQAcgBMnJaSDAB4pspIHk'; // Replace with your actual key
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwYXV0dXZzanpvaXBia3V1ZnlsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY1MTg1NDMsImV4cCI6MjA1MjA5NDU0M30.c3lfVfxkbuvSbROKj_OYRewQAcgBMnJaSDAB4pspIHk';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Logger setup using Winston
@@ -35,36 +34,46 @@ const logger = winston.createLogger({
   ]
 });
 
+// Function to validate and format fbstate cookies
+function formatCookies(fbstateCookies) {
+  if (!Array.isArray(fbstateCookies)) {
+    throw new Error('Invalid fbstate format: Expected an array of cookies.');
+  }
+
+  return fbstateCookies.map(cookie => {
+    if (!cookie.key || !cookie.value || !cookie.domain || !cookie.path) {
+      throw new Error(`Invalid cookie structure: ${JSON.stringify(cookie)}`);
+    }
+
+    return {
+      name: cookie.key,
+      value: cookie.value,
+      domain: cookie.domain,
+      path: cookie.path,
+      httpOnly: cookie.hostOnly ? false : true,
+      secure: cookie.secure || false,
+      sameSite: 'Lax',
+    };
+  });
+}
+
 // Function to simulate Facebook post sharing
 async function shareOnFacebook(postLink, fbstateCookies) {
   let browser;
   try {
-    // Launch Puppeteer with necessary arguments
+    // Launch Puppeteer
     browser = await puppeteer.launch({
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
     const page = await browser.newPage();
 
     // Validate and set cookies
-    if (!Array.isArray(fbstateCookies)) {
-      throw new Error('Invalid cookie format: Expected an array of cookies');
-    }
-    for (const cookie of fbstateCookies) {
-      const cookieData = {
-        name: cookie.key,
-        value: cookie.value,
-        domain: cookie.domain,
-        path: cookie.path,
-        httpOnly: cookie.hostOnly ? false : true,
-        secure: false,
-        sameSite: 'Lax',
-      };
-      await page.setCookie(cookieData);
-    }
+    const cookies = formatCookies(fbstateCookies);
+    await page.setCookie(...cookies);
 
     // Navigate to the post link
-    await page.goto(postLink);
+    await page.goto(postLink, { waitUntil: 'networkidle2' });
 
     // Simulate the action of clicking the share button
     await page.waitForSelector('button[data-testid="share_button"]', { timeout: 10000 });
