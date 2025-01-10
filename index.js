@@ -22,7 +22,7 @@ app.use(bodyParser.json());
 
 // Supabase connection
 const supabaseUrl = 'https://fpautuvsjzoipbkuufyl.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwYXV0dXZzanpvaXBia3V1ZnlsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY1MTg1NDMsImV4cCI6MjA1MjA5NDU0M30.c3lfVfxkbuvSbROKj_OYRewQAcgBMnJaSDAB4pspIHk';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwYXV0dXZajn...';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Logger setup using Winston
@@ -36,11 +36,10 @@ const logger = winston.createLogger({
 
 // Function to validate and set cookies
 async function setCookies(page, cookies) {
-  if (!Array.isArray(cookies)) {
-    throw new Error('Invalid fbstate format: Expected an array of cookies.');
-  }
+  // Ensure cookies is an array, even if it's a single object
+  const cookieArray = Array.isArray(cookies) ? cookies : [cookies];
 
-  const formattedCookies = cookies.map(cookie => {
+  const formattedCookies = cookieArray.map(cookie => {
     if (!cookie.key || !cookie.value || !cookie.domain || !cookie.path) {
       throw new Error('Invalid cookie format. Each cookie must contain "key", "value", "domain", and "path".');
     }
