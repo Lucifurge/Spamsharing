@@ -22,7 +22,7 @@ app.use(bodyParser.json());
 
 // Supabase connection
 const supabaseUrl = 'https://fpautuvsjzoipbkuufyl.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwYXV0dXZzanpvaXBia3V1ZnlsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY1MTg1NDMsImV4cCI6MjA1MjA5NDU0M30.c3lfVfxkbuvSbROKj_OYRewQAcgBMnJaSDAB4pspIHk';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwYXV0dXZzanpvaXBia3V1ZnlsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY1MTg1NDMsImV4cCI6MjA1MjA5NDU0M30.c3lfVfxkbuvSbROKj_OYRewQAcgBMnJaSDAB4pspIHk'; // Make sure to replace this with your actual key
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Logger setup using Winston
@@ -35,30 +35,31 @@ const logger = winston.createLogger({
 });
 
 // Function to validate and set cookies
-async function setCookies(page, cookies) {
-  // Ensure cookies is an array, even if it's a single object
-  const cookieArray = Array.isArray(cookies) ? cookies : [cookies];
+async function setCookies(page, fbstate) {
+  const cookies = JSON.parse(fbstate);
 
-  const formattedCookies = cookieArray.map(cookie => {
+  // Validate the structure of each cookie
+  cookies.forEach(cookie => {
     if (!cookie.key || !cookie.value || !cookie.domain || !cookie.path) {
       throw new Error('Invalid cookie format. Each cookie must contain "key", "value", "domain", and "path".');
     }
-    return {
-      name: cookie.key,
-      value: cookie.value,
-      domain: cookie.domain,
-      path: cookie.path,
-      httpOnly: cookie.hostOnly === false, // Set httpOnly based on hostOnly
-      secure: true, // Assuming secure cookies are required
-      sameSite: 'Lax',
-    };
   });
+
+  const formattedCookies = cookies.map(cookie => ({
+    name: cookie.key,
+    value: cookie.value,
+    domain: cookie.domain,
+    path: cookie.path,
+    httpOnly: cookie.hostOnly === false,
+    secure: true, // Assuming secure cookies are required
+    sameSite: 'Lax',
+  }));
 
   await page.setCookie(...formattedCookies);
 }
 
 // Function to simulate Facebook post sharing
-async function shareOnFacebook(postLink, fbstateCookies) {
+async function shareOnFacebook(postLink, fbstate) {
   let browser;
   try {
     browser = await puppeteer.launch({
@@ -68,7 +69,7 @@ async function shareOnFacebook(postLink, fbstateCookies) {
     const page = await browser.newPage();
 
     // Set cookies
-    await setCookies(page, fbstateCookies);
+    await setCookies(page, fbstate);
 
     // Navigate to the post link
     await page.goto(postLink, { waitUntil: 'networkidle2' });
@@ -95,18 +96,19 @@ async function shareOnFacebook(postLink, fbstateCookies) {
 app.post('/share', async (req, res) => {
   const { fbstate, postLink, interval, shares } = req.body;
 
+  // Ensure fbstate, postLink, interval, and shares are provided in the request
   if (!fbstate || !postLink || !interval || !shares) {
     return res.status(400).json({ message: 'Missing required parameters.' });
   }
 
   try {
     // Insert the share data into Supabase with status 'Started'
-    const { error } = await supabase
+    const { error: insertError } = await supabase
       .from('shares')
-      .insert([{ post_id: postLink, fb_cookie_id: 1, interval_seconds: interval, share_count: shares, status: 'Started' }]);
+      .insert([{ post_id: postLink, fb_cookie_id: 1, interval_seconds: interval, share_count: shares, status: 'Started', fbstate: fbstate }]);
 
-    if (error) {
-      logger.error('Error inserting share log:', error);
+    if (insertError) {
+      logger.error('Error inserting share log:', insertError);
       return res.status(500).json({ message: 'Error inserting share log into database.' });
     }
 
