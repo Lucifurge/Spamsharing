@@ -3,10 +3,21 @@ const puppeteer = require('puppeteer');
 const { createClient } = require('@supabase/supabase-js');
 const bodyParser = require('body-parser');
 const winston = require('winston');
+const cors = require('cors'); // Import CORS package
 
 // Initialize the Express app and middleware
 const app = express();
 const port = process.env.PORT || 3000;
+
+// Use CORS middleware and specify the frontend URL
+const allowedOrigins = ['https://frontend-253d.onrender.com']; // Frontend URL
+app.use(cors({
+  origin: allowedOrigins,
+  methods: ['GET', 'POST'],
+  allowedHeaders: ['Content-Type']
+}));
+
+// Middleware for parsing JSON
 app.use(bodyParser.json());
 
 // Supabase connection
@@ -68,6 +79,7 @@ app.post('/share', async (req, res) => {
     const { data, error } = await supabase
       .from('shares')
       .insert([{ post_id: fbstate, fb_cookie_id: 1, interval_seconds: interval, share_count: shares, status: 'Started' }]);
+
 
     if (error) {
       logger.error('Error inserting share log:', error);
