@@ -22,7 +22,7 @@ app.use(bodyParser.json());
 
 // Supabase connection
 const supabaseUrl = 'https://fpautuvsjzoipbkuufyl.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwYXV0dXZzanpvaXBia3V1ZnlsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY1MTg1NDMsImV4cCI6MjA1MjA5NDU0M30.c3lfVfxkbuvSbROKj_OYRewQAcgBMnJaSDAB4pspIHk'; // Replace with your actual key
+const supabaseKey = 'your-supabase-key'; // Replace with your actual key
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Logger setup using Winston
@@ -34,13 +34,14 @@ const logger = winston.createLogger({
   ],
 });
 
-// Function to validate and set cookies for Facebook
+// Function to validate and set cookies
 async function setCookies(page, fbstate) {
   const cookies = JSON.parse(fbstate);
 
+  // Validate the structure of each cookie
   cookies.forEach(cookie => {
     if (!cookie.key || !cookie.value || !cookie.domain || !cookie.path) {
-      throw new Error('Invalid cookie format.');
+      throw new Error('Invalid cookie format. Each cookie must contain "key", "value", "domain", and "path".');
     }
   });
 
@@ -50,7 +51,7 @@ async function setCookies(page, fbstate) {
     domain: cookie.domain,
     path: cookie.path,
     httpOnly: cookie.hostOnly === false,
-    secure: true,
+    secure: true, // Assuming secure cookies are required
     sameSite: 'Lax',
   }));
 
@@ -62,22 +63,24 @@ async function shareOnFacebook(postLink, fbstate) {
   let browser;
   try {
     browser = await puppeteer.launch({
-      headless: false, // Change to true for headless mode
+      headless: true,
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
     const page = await browser.newPage();
 
-    // Set cookies for Facebook session
+    // Set cookies
     await setCookies(page, fbstate);
 
-    // Navigate to the post URL
+    // Navigate to the post link
     await page.goto(postLink, { waitUntil: 'networkidle2' });
 
-    // Wait for the share button and click it
-    await page.waitForSelector('button[data-testid="share_button"]', { timeout: 70000 });
+    // Wait for the share button to load and click it
+    await page.waitForSelector('button[data-testid="share_button"]', { timeout: 60000 });
+
+    // Click the share button
     await page.click('button[data-testid="share_button"]');
 
-    // Wait for the share action to complete
+    // Wait for the post to be shared
     await page.waitForTimeout(5000);
 
     logger.info(`Successfully shared post: ${postLink}`);
@@ -95,7 +98,7 @@ async function shareOnFacebook(postLink, fbstate) {
 app.post('/share', async (req, res) => {
   const { fbstate, postLink, interval, shares } = req.body;
 
-  // Validate request data
+  // Ensure fbstate, postLink, interval, and shares are provided in the request
   if (!fbstate || !postLink || !interval || !shares) {
     return res.status(400).json({ message: 'Missing required parameters.' });
   }
@@ -115,10 +118,10 @@ app.post('/share', async (req, res) => {
     for (let i = 0; i < shares; i++) {
       await shareOnFacebook(postLink, fbstate);
       logger.info(`Shared ${i + 1} of ${shares}`);
-      await new Promise(resolve => setTimeout(resolve, interval * 1000));
+      await new Promise(resolve => setTimeout(resolve, interval * 1000)); // Interval between shares
     }
 
-    // Update the share log status to 'Completed' in the database
+    // Update the share log status in the database to 'Completed'
     const { error: updateError } = await supabase
       .from('shares')
       .update({ status: 'Completed' })
