@@ -1,0 +1,21 @@
+{
+  "name": "facebook-share-automation",
+  "version": "1.0.0",
+  "description": "Automate Facebook post sharing with Puppeteer and Supabase",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "body-parser": "^1.20.3",
+    "express": "^4.21.2",
+    "puppeteer": "^24.0.0",  
+   "@supabase/supabase-js": "^2.47.12",
+    "winston": "^3.17.3"
+  },
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "author": "Your Name",
+  "license": "MIT"
+}
