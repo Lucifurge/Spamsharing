@@ -1,11 +1,13 @@
+require('dotenv').config(); // Load environment variables
+
 const express = require('express');
 const puppeteer = require('puppeteer');
 const { createClient } = require('@supabase/supabase-js');
 const bodyParser = require('body-parser');
 const winston = require('winston');
-const cors = require('cors'); // Import CORS package
+const cors = require('cors');
 
-// Initialize the Express app and middleware
+// Initialize Express app and middleware
 const app = express();
 const port = process.env.PORT || 3000;
 
@@ -37,28 +39,18 @@ const logger = winston.createLogger({
 // Function to simulate Facebook post sharing
 async function shareOnFacebook(postLink, fbstate, cookies) {
   try {
-    // Launch Puppeteer and open Facebook
     const browser = await puppeteer.launch({ headless: true });
     const page = await browser.newPage();
 
-    // Login to Facebook with cookies from the Supabase DB
     cookies.forEach(cookie => {
       page.setCookie(cookie);
     });
 
-    // Navigate to the post link
     await page.goto(postLink);
-
-    // Simulate the action of clicking the share button
     await page.click('button[data-testid="share_button"]');
+    await page.waitForTimeout(5000); // Wait for share to complete
 
-    // Wait for the share action to complete
-    await page.waitForTimeout(5000); // 5 seconds wait
-
-    // Optionally, capture a success message or confirm the share
     logger.info(`Successfully shared post: ${fbstate}`);
-
-    // Close the browser
     await browser.close();
   } catch (err) {
     logger.error('Error in shareOnFacebook:', err);
@@ -75,36 +67,31 @@ app.post('/share', async (req, res) => {
   }
 
   try {
-    // Insert the share data into Supabase with status 'Started'
     const { data, error } = await supabase
       .from('shares')
       .insert([{ post_id: fbstate, fb_cookie_id: 1, interval_seconds: interval, share_count: shares, status: 'Started' }]);
-
 
     if (error) {
       logger.error('Error inserting share log:', error);
       return res.status(500).json({ message: 'Error inserting share log into database' });
     }
 
-    // Fetch cookies from the database for login
     const { data: cookiesData, error: cookiesError } = await supabase
       .from('facebook_cookies')
       .select('*')
-      .eq('user_id', 1); // assuming you store the cookies for the user in this table
+      .eq('user_id', 1); // Adjust user ID as needed
 
     if (cookiesError) {
       logger.error('Error fetching cookies:', cookiesError);
       return res.status(500).json({ message: 'Error fetching cookies from database' });
     }
 
-    // Loop to simulate the sharing process for the specified number of shares
     for (let i = 0; i < shares; i++) {
-      await shareOnFacebook(postLink, fbstate, cookiesData); // Share once for each iteration
+      await shareOnFacebook(postLink, fbstate, cookiesData);
       logger.info(`Shared ${i + 1} of ${shares}`);
-      await new Promise(resolve => setTimeout(resolve, interval * 1000)); // Wait for the specified interval
+      await new Promise(resolve => setTimeout(resolve, interval * 1000)); // Wait between shares
     }
 
-    // Update the share log status in the database to 'Completed'
     const { data: updatedData, error: updateError } = await supabase
       .from('shares')
       .update({ status: 'Completed' })
