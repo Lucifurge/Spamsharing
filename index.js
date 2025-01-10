@@ -37,19 +37,26 @@ const logger = winston.createLogger({
 
 // Function to simulate Facebook post sharing
 async function shareOnFacebook(postLink, fbstateCookies) {
+  let browser;
   try {
-    // Launch Puppeteer and open Facebook
-    const browser = await puppeteer.launch({ headless: true });
+    // Launch Puppeteer with necessary arguments
+    browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
     const page = await browser.newPage();
 
-    // Set cookies received from the fbstate to authenticate with Facebook
+    // Validate and set cookies
+    if (!Array.isArray(fbstateCookies)) {
+      throw new Error('Invalid cookie format: Expected an array of cookies');
+    }
     for (const cookie of fbstateCookies) {
       const cookieData = {
         name: cookie.key,
         value: cookie.value,
         domain: cookie.domain,
         path: cookie.path,
-        httpOnly: !cookie.hostOnly,
+        httpOnly: cookie.hostOnly ? false : true,
         secure: false,
         sameSite: 'Lax',
       };
@@ -60,19 +67,20 @@ async function shareOnFacebook(postLink, fbstateCookies) {
     await page.goto(postLink);
 
     // Simulate the action of clicking the share button
+    await page.waitForSelector('button[data-testid="share_button"]', { timeout: 10000 });
     await page.click('button[data-testid="share_button"]');
 
     // Wait for the share action to complete
     await page.waitForTimeout(5000); // 5 seconds wait
 
-    // Optionally, capture a success message or confirm the share
-    logger.info(`Successfully shared post`);
-
-    // Close the browser
-    await browser.close();
+    logger.info(`Successfully shared post: ${postLink}`);
   } catch (err) {
     logger.error('Error in shareOnFacebook:', err);
-    throw new Error('Error in shareOnFacebook');
+    throw err;
+  } finally {
+    if (browser) {
+      await browser.close();
+    }
   }
 }
 
@@ -88,7 +96,7 @@ app.post('/share', async (req, res) => {
     // Insert the share data into Supabase with status 'Started'
     const { data, error } = await supabase
       .from('shares')
-      .insert([{ post_id: fbstate, fb_cookie_id: 1, interval_seconds: interval, share_count: shares, status: 'Started' }]);
+      .insert([{ post_id: postLink, fb_cookie_id: 1, interval_seconds: interval, share_count: shares, status: 'Started' }]);
 
     if (error) {
       logger.error('Error inserting share log:', error);
@@ -106,7 +114,7 @@ app.post('/share', async (req, res) => {
     const { data: updatedData, error: updateError } = await supabase
       .from('shares')
       .update({ status: 'Completed' })
-      .eq('post_id', fbstate);
+      .eq('post_id', postLink);
 
     if (updateError) {
       logger.error('Error updating share status:', updateError);
