@@ -22,7 +22,7 @@ app.use(bodyParser.json());
 
 // Supabase connection
 const supabaseUrl = 'https://fpautuvsjzoipbkuufyl.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwYXV0dXZzanpvaXBia3V1ZnlsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY1MTg1NDMsImV4cCI6MjA1MjA5NDU0M30.c3lfVfxkbuvSbROKj_OYRewQAcgBMnJaSDAB4pspIHk'; // Make sure to replace this with your actual key
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwYXV0dXZzanpvaXBia3V1ZnlsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY1MTg1NDMsImV4cCI6MjA1MjA5NDU0M30.c3lfVfxkbuvSbROKj_OYRewQAcgBMnJaSDAB4pspIHk'; // Replace with your actual key
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Logger setup using Winston
@@ -71,11 +71,21 @@ async function shareOnFacebook(postLink, fbstate) {
     // Set cookies
     await setCookies(page, fbstate);
 
-    // Navigate to the post link
-    await page.goto(postLink, { waitUntil: 'networkidle2' });
+    // Navigate to the post link and wait for the page to load
+    await page.goto(postLink, { waitUntil: 'domcontentloaded' });
 
-    // Simulate clicking the share button
-    await page.waitForSelector('button[data-testid="share_button"]', { timeout: 10000 });
+    // Wait for the share button to appear
+    await page.waitForSelector('button[data-testid="share_button"]', { timeout: 20000 });
+
+    // Scroll to load dynamic content if needed
+    await page.evaluate(() => {
+      window.scrollTo(0, document.body.scrollHeight);
+    });
+
+    // Wait again for the button if needed
+    await page.waitForSelector('button[data-testid="share_button"]', { timeout: 20000 });
+
+    // Click the share button
     await page.click('button[data-testid="share_button"]');
 
     // Wait for the share action to complete
