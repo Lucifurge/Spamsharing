@@ -34,14 +34,13 @@ const logger = winston.createLogger({
   ],
 });
 
-// Function to validate and set cookies
+// Function to validate and set cookies for Facebook
 async function setCookies(page, fbstate) {
   const cookies = JSON.parse(fbstate);
 
-  // Validate the structure of each cookie
   cookies.forEach(cookie => {
     if (!cookie.key || !cookie.value || !cookie.domain || !cookie.path) {
-      throw new Error('Invalid cookie format. Each cookie must contain "key", "value", "domain", and "path".');
+      throw new Error('Invalid cookie format.');
     }
   });
 
@@ -51,7 +50,7 @@ async function setCookies(page, fbstate) {
     domain: cookie.domain,
     path: cookie.path,
     httpOnly: cookie.hostOnly === false,
-    secure: true, // Assuming secure cookies are required
+    secure: true,
     sameSite: 'Lax',
   }));
 
@@ -63,29 +62,19 @@ async function shareOnFacebook(postLink, fbstate) {
   let browser;
   try {
     browser = await puppeteer.launch({
-      headless: true,
+      headless: false, // Change to true for headless mode
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
     const page = await browser.newPage();
 
-    // Set cookies
+    // Set cookies for Facebook session
     await setCookies(page, fbstate);
 
-    // Navigate to the post link and wait for the page to load
-    await page.goto(postLink, { waitUntil: 'domcontentloaded' });
+    // Navigate to the post URL
+    await page.goto(postLink, { waitUntil: 'networkidle2' });
 
-    // Wait for the share button to appear
-    await page.waitForSelector('button[data-testid="share_button"]', { timeout: 20000 });
-
-    // Scroll to load dynamic content if needed
-    await page.evaluate(() => {
-      window.scrollTo(0, document.body.scrollHeight);
-    });
-
-    // Wait again for the button if needed
-    await page.waitForSelector('button[data-testid="share_button"]', { timeout: 20000 });
-
-    // Click the share button
+    // Wait for the share button and click it
+    await page.waitForSelector('button[data-testid="share_button"]', { timeout: 70000 });
     await page.click('button[data-testid="share_button"]');
 
     // Wait for the share action to complete
@@ -106,7 +95,7 @@ async function shareOnFacebook(postLink, fbstate) {
 app.post('/share', async (req, res) => {
   const { fbstate, postLink, interval, shares } = req.body;
 
-  // Ensure fbstate, postLink, interval, and shares are provided in the request
+  // Validate request data
   if (!fbstate || !postLink || !interval || !shares) {
     return res.status(400).json({ message: 'Missing required parameters.' });
   }
@@ -129,7 +118,7 @@ app.post('/share', async (req, res) => {
       await new Promise(resolve => setTimeout(resolve, interval * 1000));
     }
 
-    // Update the share log status in the database to 'Completed'
+    // Update the share log status to 'Completed' in the database
     const { error: updateError } = await supabase
       .from('shares')
       .update({ status: 'Completed' })
