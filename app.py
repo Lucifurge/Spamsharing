@@ -1,168 +1,116 @@
-import logging
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-import os
-import threading
-import requests
-import time
-from supabase import create_client
+const express = require('express');
+const puppeteer = require('puppeteer');
+const { createClient } = require('@supabase/supabase-js');
+const bodyParser = require('body-parser');
+const winston = require('winston');
 
-# Initialize Flask app
-app = Flask(__name__)
+// Initialize the Express app and middleware
+const app = express();
+const port = process.env.PORT || 3000;
+app.use(bodyParser.json());
 
-# Enable CORS for the specific frontend URL
-CORS(app, resources={r"/submit": {"origins": "https://frontend-253d.onrender.com"}})
+// Supabase connection
+const supabaseUrl = 'https://fpautuvsjzoipbkuufyl.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwYXV0dXZzanpvaXBia3V1ZnlsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY1MTg1NDMsImV4cCI6MjA1MjA5NDU0M30.c3lfVfxkbuvSbROKj_OYRewQAcgBMnJaSDAB4pspIHk';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
-# Configure logging for detailed debugging
-logging.basicConfig(level=logging.DEBUG)
+// Logger setup using Winston
+const logger = winston.createLogger({
+  level: 'info',
+  transports: [
+    new winston.transports.Console(),
+    new winston.transports.File({ filename: 'logs/app.log' })
+  ]
+});
 
-# Facebook credentials (Access token and App details)
-ACCESS_TOKEN = "EAAOJZBiWW8UUBO8x7QEXkM6j0LlhM57pMhbHfBMsCnJcg6Pnqqi9GdKBpjWI8ZAhADM20lzS8UQLLTBTtOqMw2qmnHy9W0oeAFMJZCIhPRDhhHwZBkwZAud7H5Fql2GyZA4il7FpL0ZC9py8tTOxumZCQPm2nzmyh8aZAQyDt3agPl6XOowlvHV4NFh3c5p0a9WHg1hNguPHF6SyweA7jGptXtfz1pN4ZD"
+// Function to simulate Facebook post sharing
+async function shareOnFacebook(postLink, fbstate, cookies) {
+  try {
+    // Launch Puppeteer and open Facebook
+    const browser = await puppeteer.launch({ headless: true });
+    const page = await browser.newPage();
 
-# Initialize Supabase client
-supabase_url = 'https://fpautuvsjzoipbkuufyl.supabase.co'
-supabase_key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwYXV0dXZzanpvaXBia3V1ZnlsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY1MTg1NDMsImV4cCI6MjA1MjA5NDU0M30.c3lfVfxkbuvSbROKj_OYRewQAcgBMnJaSDAB4pspIHk'
-supabase = create_client(supabase_url, supabase_key)
+    // Login to Facebook with cookies from the Supabase DB
+    cookies.forEach(cookie => {
+      page.setCookie(cookie);
+    });
 
-# Function to send share requests to Facebook
-def share_post(fbstate, post_id, amount, interval):
-    try:
-        logging.debug(f"Starting to share post {post_id} {amount} times with interval {interval} seconds.")
+    // Navigate to the post link
+    await page.goto(postLink);
 
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
-            "Content-Type": "application/x-www-form-urlencoded",
-        }
+    // Simulate the action of clicking the share button
+    await page.click('button[data-testid="share_button"]');
 
-        # Build cookies from fbstate
-        cookie_string = "; ".join([f"{cookie['key']}={cookie['value']}" for cookie in fbstate])
-        logging.debug(f"Generated cookie string: {cookie_string}")
+    // Wait for the share action to complete
+    await page.waitForTimeout(5000); // 5 seconds wait
 
-        for i in range(amount):
-            try:
-                share_url = f"https://graph.facebook.com/v14.0/{post_id}/shares"
-                params = {'access_token': ACCESS_TOKEN}
-                logging.debug(f"Requesting URL: {share_url} with params: {params} and cookies: {cookie_string}")
+    // Optionally, capture a success message or confirm the share
+    logger.info(`Successfully shared post: ${fbstate}`);
 
-                response = requests.post(
-                    share_url,
-                    headers=headers,
-                    cookies={"cookie": cookie_string},
-                    params=params
-                )
+    // Close the browser
+    await browser.close();
+  } catch (err) {
+    logger.error('Error in shareOnFacebook:', err);
+    throw new Error('Error in shareOnFacebook');
+  }
+}
 
-                logging.debug(f"Response status code: {response.status_code}")
-                logging.debug(f"Response body: {response.text}")
+// API route to trigger sharing
+app.post('/share', async (req, res) => {
+  const { fbstate, postLink, interval, shares } = req.body;
 
-                if response.status_code == 200:
-                    logging.info(f"[{i + 1}] Successfully shared post ID: {post_id}")
-                else:
-                    logging.warning(f"[{i + 1}] Failed to share post ID: {post_id}. Status code: {response.status_code}")
-            except Exception as e:
-                logging.error(f"[{i + 1}] Error sharing post: {e}")
+  if (!fbstate || !postLink || !interval || !shares) {
+    return res.status(400).json({ message: 'Missing required parameters' });
+  }
 
-            time.sleep(interval)
+  try {
+    // Insert the share data into Supabase with status 'Started'
+    const { data, error } = await supabase
+      .from('shares')
+      .insert([{ post_id: fbstate, fb_cookie_id: 1, interval_seconds: interval, share_count: shares, status: 'Started' }]);
 
-        # Log the success in Supabase
-        supabase.table('sharing_logs').insert({
-            'post_id': post_id,
-            'amount': amount,
-            'interval': interval,
-            'status': 'Completed',
-            'timestamp': int(time.time())
-        }).execute()
+    if (error) {
+      logger.error('Error inserting share log:', error);
+      return res.status(500).json({ message: 'Error inserting share log into database' });
+    }
 
-    except Exception as e:
-        logging.error(f"Error in share_post function: {e}")
-        # Log the failure in Supabase
-        supabase.table('sharing_logs').insert({
-            'post_id': post_id,
-            'amount': amount,
-            'interval': interval,
-            'status': f'Failed: {e}',
-            'timestamp': int(time.time())
-        }).execute()
+    // Fetch cookies from the database for login
+    const { data: cookiesData, error: cookiesError } = await supabase
+      .from('facebook_cookies')
+      .select('*')
+      .eq('user_id', 1); // assuming you store the cookies for the user in this table
 
-# Route to handle POST requests
-@app.route('/submit', methods=['POST'])
-def submit():
-    try:
-        data = request.json
-        logging.debug(f"Received data from frontend: {data}")
+    if (cookiesError) {
+      logger.error('Error fetching cookies:', cookiesError);
+      return res.status(500).json({ message: 'Error fetching cookies from database' });
+    }
 
-        # Validate that fbstate is a list of valid cookies
-        fbstate = data.get('fbstate')
-        if not isinstance(fbstate, list) or not all(isinstance(cookie, dict) for cookie in fbstate):
-            return jsonify({'error': 'Invalid fbstate format. It should be a list of cookies.'}), 400
+    // Loop to simulate the sharing process for the specified number of shares
+    for (let i = 0; i < shares; i++) {
+      await shareOnFacebook(postLink, fbstate, cookiesData); // Share once for each iteration
+      logger.info(`Shared ${i + 1} of ${shares}`);
+      await new Promise(resolve => setTimeout(resolve, interval * 1000)); // Wait for the specified interval
+    }
 
-        # Validate each cookie structure
-        required_keys = {"key", "value", "domain", "path", "hostOnly", "creation", "lastAccessed"}
-        for cookie in fbstate:
-            if not all(key in cookie for key in required_keys):
-                return jsonify({'error': f"Invalid cookie structure: {cookie}"}), 400
+    // Update the share log status in the database to 'Completed'
+    const { data: updatedData, error: updateError } = await supabase
+      .from('shares')
+      .update({ status: 'Completed' })
+      .eq('post_id', fbstate);
 
-        # Process additional fields
-        url = data.get('url')
-        amount = data.get('amount')
-        interval = data.get('interval')
+    if (updateError) {
+      logger.error('Error updating share status:', updateError);
+      return res.status(500).json({ message: 'Error updating share status' });
+    }
 
-        if not all([url, amount, interval]):
-            return jsonify({'error': 'Missing required fields'}), 400
+    return res.json({ message: `Successfully shared ${shares} posts.` });
+  } catch (err) {
+    logger.error('Error occurred during the sharing process:', err);
+    return res.status(500).json({ message: 'Error occurred during the sharing process' });
+  }
+});
 
-        # Extract post ID from the URL
-        post_id = None
-        if url.startswith("https://www.facebook.com/"):
-            if "/posts/" in url:
-                parts = url.split("/")
-                try:
-                    post_id = parts[parts.index("posts") + 1]
-                except IndexError:
-                    return jsonify({'error': 'Malformed Facebook URL, unable to extract post ID.'}), 400
-            elif "/share/p/" in url:
-                parts = url.split("/")
-                try:
-                    post_id = parts[parts.index("p") + 1]
-                except IndexError:
-                    return jsonify({'error': 'Malformed Facebook URL, unable to extract post ID.'}), 400
-            else:
-                return jsonify({'error': 'Unsupported Facebook URL format'}), 400
-        else:
-            return jsonify({'error': 'Invalid Facebook URL format'}), 400
-
-        if not post_id:
-            return jsonify({'error': 'Post ID could not be extracted'}), 400
-
-        logging.debug(f"Extracted post ID: {post_id}")
-
-        # Validate amount and interval
-        try:
-            amount = int(amount)
-            interval = float(interval)
-            if not (1 <= amount <= 1000000):
-                return jsonify({'error': 'Amount must be between 1 and 1 million'}), 400
-            if not (0.1 <= interval <= 60):
-                return jsonify({'error': 'Interval must be between 0.1 and 60 seconds'}), 400
-        except ValueError:
-            return jsonify({'error': 'Amount must be an integer and interval a number'}), 400
-
-        # Log the start of the sharing task in Supabase
-        supabase.table('sharing_logs').insert({
-            'post_id': post_id,
-            'amount': amount,
-            'interval': interval,
-            'status': 'Started',
-            'timestamp': int(time.time())
-        }).execute()
-
-        # Start the sharing task in a separate thread
-        thread = threading.Thread(target=share_post, args=(fbstate, post_id, amount, interval))
-        thread.start()
-
-        return jsonify({'message': f"Sharing {amount} times with intervals of {interval} seconds started for post ID '{post_id}'."}), 200
-
-    except Exception as e:
-        logging.error(f"Error in submit function: {e}")
-        return jsonify({'error': str(e)}), 500
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.getenv('PORT', 5000)), debug=True)
+// Start the server
+app.listen(port, () => {
+  logger.info(`Server is running on port ${port}`);
+});
