@@ -22,7 +22,7 @@ app.use(bodyParser.json());
 
 // Supabase connection
 const supabaseUrl = 'https://fpautuvsjzoipbkuufyl.supabase.co';
-const supabaseKey = 'your_supabase_key';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwYXV0dXZzanpvaXBia3V1ZnlsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY1MTg1NDMsImV4cCI6MjA1MjA5NDU0M30.c3lfVfxkbuvSbROKj_OYRewQAcgBMnJaSDAB4pspIHk';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Logger setup using Winston
