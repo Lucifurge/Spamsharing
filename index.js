@@ -72,19 +72,16 @@ async function shareOnFacebook(postLink, fbstate) {
     await setCookies(page, fbstate);
 
     // Navigate to the post link
-    await page.goto(postLink, { waitUntil: 'networkidle2' });
+    await page.goto(postLink, { waitUntil: 'networkidle2', timeout: 120000 });
 
-    // Wait for the share button to load and click it
-    await page.waitForSelector('button[data-testid="share_button"], button[name="share"]', { timeout: 60000 });
+    // Wait for the body to fully load
+    await page.waitForSelector('body', { timeout: 120000 });
 
-    // Click the share button (this opens the share dialog)
-    await page.click('button[data-testid="share_button"]');
+    // Wait for the share button to appear
+    await page.waitForSelector('button[name="share"], button[data-testid="share_button"]', { timeout: 60000 });
 
-    // Wait for the modal to appear, where options like "Share Now" can be selected
-    await page.waitForSelector('div[aria-label="Share on your Timeline"]', { timeout: 10000 });
-
-    // Click 'Share Now' or prevent posting to profile by finding the appropriate element
-    await page.click('button[data-testid="share_button_submit"]'); // Adjust this based on actual button selector
+    // Click the share button
+    await page.click('button[name="share"], button[data-testid="share_button"]');
 
     // Wait for the post to be shared
     await page.waitForTimeout(5000);
