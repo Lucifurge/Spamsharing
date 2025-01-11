@@ -74,8 +74,8 @@ async function shareOnFacebook(postLink, fbstate) {
     // Navigate to the post link
     await page.goto(postLink, { waitUntil: 'networkidle2', timeout: 120000 });
 
-    // Wait for the share button to appear
-    await page.waitForSelector('button[name="share"], button[data-testid="share_button"]', { timeout: 60000 });
+    // Wait for the share button to appear and be visible
+    await page.waitForSelector('button[name="share"], button[data-testid="share_button"]', { timeout: 120000, visible: true });
 
     // Click the share button
     await page.click('button[name="share"], button[data-testid="share_button"]');
