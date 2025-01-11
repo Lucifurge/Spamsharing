@@ -51,7 +51,7 @@ async function setCookies(page, fbstate) {
     domain: cookie.domain,
     path: cookie.path,
     httpOnly: cookie.hostOnly === false,
-    secure: true, // Assuming secure cookies are required
+    secure: true,
     sameSite: 'Lax',
   }));
 
@@ -74,9 +74,6 @@ async function shareOnFacebook(postLink, fbstate) {
     // Navigate to the post link
     await page.goto(postLink, { waitUntil: 'networkidle2', timeout: 120000 });
 
-    // Wait for the body to fully load
-    await page.waitForSelector('body', { timeout: 120000 });
-
     // Wait for the share button to appear
     await page.waitForSelector('button[name="share"], button[data-testid="share_button"]', { timeout: 60000 });
 
@@ -97,34 +94,30 @@ async function shareOnFacebook(postLink, fbstate) {
   }
 }
 
-// API route to trigger sharing
+// API route to handle sharing requests
 app.post('/share', async (req, res) => {
   const { fbstate, postLink, interval, shares } = req.body;
 
-  // Ensure fbstate, postLink, interval, and shares are provided in the request
   if (!fbstate || !postLink || !interval || !shares) {
     return res.status(400).json({ message: 'Missing required parameters.' });
   }
 
   try {
-    // Insert the share data into Supabase with status 'Started'
     const { error: insertError } = await supabase
       .from('shares')
-      .insert([{ post_id: postLink, fb_cookie_id: 1, interval_seconds: interval, share_count: shares, status: 'Started', fbstate: fbstate }]);
+      .insert([{ post_id: postLink, fb_cookie_id: 1, interval_seconds: interval, share_count: shares, status: 'Started', fbstate }]);
 
     if (insertError) {
       logger.error('Error inserting share log:', insertError);
       return res.status(500).json({ message: 'Error inserting share log into database.' });
     }
 
-    // Loop to simulate the sharing process
     for (let i = 0; i < shares; i++) {
       await shareOnFacebook(postLink, fbstate);
       logger.info(`Shared ${i + 1} of ${shares}`);
-      await new Promise(resolve => setTimeout(resolve, interval * 1000)); // Interval between shares
+      await new Promise(resolve => setTimeout(resolve, interval * 1000));
     }
 
-    // Update the share log status in the database to 'Completed'
     const { error: updateError } = await supabase
       .from('shares')
       .update({ status: 'Completed' })
@@ -137,12 +130,29 @@ app.post('/share', async (req, res) => {
 
     res.json({ message: `Successfully shared ${shares} posts.` });
   } catch (err) {
-    logger.error('Error occurred during the sharing process:', err);
+    logger.error('Error during the sharing process:', err);
     res.status(500).json({ message: 'Error occurred during the sharing process.' });
   }
 });
 
-// Handle preflight OPTIONS requests for CORS
+// Endpoint to generate Facebook share URL
+app.post('/generate-share-url', (req, res) => {
+  const { postLink } = req.body;
+
+  if (!postLink) {
+    return res.status(400).json({ message: 'Post link is required.' });
+  }
+
+  try {
+    const facebookShareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(postLink)}`;
+    res.json({ message: 'Share URL generated successfully.', shareUrl: facebookShareUrl });
+  } catch (error) {
+    logger.error('Error generating share URL:', error);
+    res.status(500).json({ message: 'Error generating share URL.' });
+  }
+});
+
+// Preflight OPTIONS requests
 app.options('*', cors());
 
 // Start the server
