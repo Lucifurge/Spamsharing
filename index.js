@@ -63,7 +63,7 @@ async function shareOnFacebook(postLink, fbstate) {
   let browser;
   try {
     browser = await puppeteer.launch({
-      headless: true,
+      headless: false, // Running in non-headless mode for debugging
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
     const page = await browser.newPage();
@@ -71,14 +71,26 @@ async function shareOnFacebook(postLink, fbstate) {
     // Set cookies
     await setCookies(page, fbstate);
 
-    // Navigate to the post link
-    await page.goto(postLink, { waitUntil: 'networkidle2', timeout: 120000 });
+    // Navigate to the post link with retry logic
+    let navigationSuccessful = false;
+    for (let i = 0; i < 3; i++) {
+      try {
+        await page.goto(postLink, { waitUntil: 'networkidle2', timeout: 180000 }); // Increase timeout
+        navigationSuccessful = true;
+        break;
+      } catch (error) {
+        logger.error(`Navigation attempt ${i + 1} failed: ${error}`);
+      }
+    }
+    if (!navigationSuccessful) {
+      throw new Error('Failed to navigate to the post link after multiple attempts');
+    }
 
     // Wait for the page to load completely
-    await page.waitForNavigation({ waitUntil: 'networkidle0', timeout: 120000 });
+    await page.waitForNavigation({ waitUntil: 'networkidle0', timeout: 180000 });
 
     // Wait for the share button to appear and be visible using XPath
-    await page.waitForXPath('//button[@name="share" or @data-testid="share_button"]', { timeout: 120000 });
+    await page.waitForXPath('//button[@name="share" or @data-testid="share_button"]', { timeout: 180000 });
 
     // Click the share button using XPath
     const [shareButton] = await page.$x('//button[@name="share" or @data-testid="share_button"]');
