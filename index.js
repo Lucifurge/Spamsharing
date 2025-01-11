@@ -63,7 +63,7 @@ async function shareOnFacebook(postLink, fbstate) {
   let browser;
   try {
     browser = await puppeteer.launch({
-      headless: false, // Running in non-headless mode for debugging
+      headless: true, // Running in headless mode
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
     const page = await browser.newPage();
