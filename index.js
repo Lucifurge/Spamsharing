@@ -74,11 +74,19 @@ async function shareOnFacebook(postLink, fbstate) {
     // Navigate to the post link
     await page.goto(postLink, { waitUntil: 'networkidle2', timeout: 120000 });
 
-    // Wait for the share button to appear and be visible
-    await page.waitForSelector('button[name="share"], button[data-testid="share_button"]', { timeout: 120000, visible: true });
+    // Wait for the page to load completely
+    await page.waitForNavigation({ waitUntil: 'networkidle0', timeout: 120000 });
 
-    // Click the share button
-    await page.click('button[name="share"], button[data-testid="share_button"]');
+    // Wait for the share button to appear and be visible using XPath
+    await page.waitForXPath('//button[@name="share" or @data-testid="share_button"]', { timeout: 120000 });
+
+    // Click the share button using XPath
+    const [shareButton] = await page.$x('//button[@name="share" or @data-testid="share_button"]');
+    if (shareButton) {
+      await shareButton.click();
+    } else {
+      throw new Error('Share button not found');
+    }
 
     // Wait for the post to be shared
     await page.waitForTimeout(5000);
