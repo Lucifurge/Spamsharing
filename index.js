@@ -1,10 +1,9 @@
+const express = require('express');
 const axios = require('axios');
-const C3CUtility = require('c3c-utility'); // Hypothetical C3C utility
+const app = express();
+const port = process.env.PORT || 3000;
 
-// Initialize C3C utility (replace with actual setup)
-const c3cUtility = new C3CUtility({
-  someConfig: 'configuration_value', // Replace with actual configuration
-});
+app.use(express.json());
 
 // Cookies
 const cookies = [
@@ -32,7 +31,7 @@ const timeInterval = 4000;
 const sharePost = async () => {
   try {
     // Make a request to the Facebook Graph API to share a post
-    const response = await c3cUtility.post(
+    const response = await axios.post(
       'https://graph.facebook.com/me/feed',
       {
         link: shareUrl,
