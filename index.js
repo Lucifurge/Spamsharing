@@ -1,181 +1,71 @@
-const express = require('express');
-const puppeteer = require('puppeteer');
-const { createClient } = require('@supabase/supabase-js');
-const bodyParser = require('body-parser');
-const winston = require('winston');
-const cors = require('cors');
+const axios = require('axios');
+const C3CUtility = require('c3c-utility'); // Hypothetical C3C utility
 
-// Initialize the Express app and middleware
-const app = express();
-const port = process.env.PORT || 3000;
-
-// Use CORS middleware and specify the frontend URL
-const allowedOrigins = ['https://frontend-253d.onrender.com'];
-app.use(cors({
-  origin: allowedOrigins,
-  methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type'],
-}));
-
-// Middleware for parsing JSON
-app.use(bodyParser.json());
-
-// Supabase connection
-const supabaseUrl = 'https://fpautuvsjzoipbkuufyl.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwYXV0dXZzanpvaXBia3V1ZnlsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY1MTg1NDMsImV4cCI6MjA1MjA5NDU0M30.c3lfVfxkbuvSbROKj_OYRewQAcgBMnJaSDAB4pspIHk';
-const supabase = createClient(supabaseUrl, supabaseKey);
-
-// Logger setup using Winston
-const logger = winston.createLogger({
-  level: 'info',
-  transports: [
-    new winston.transports.Console(),
-    new winston.transports.File({ filename: 'logs/app.log' }),
-  ],
+// Initialize C3C utility (replace with actual setup)
+const c3cUtility = new C3CUtility({
+  someConfig: 'configuration_value', // Replace with actual configuration
 });
 
-// Function to validate and set cookies
-async function setCookies(page, fbstate) {
-  const cookies = JSON.parse(fbstate);
+// Cookies
+const cookies = [
+  {"key":"sb","value":"_hO8Zqv2WYqGeG-5q3HklftT","domain":"facebook.com","path":"/","hostOnly":false,"creation":"2025-01-23T07:59:23.668Z","lastAccessed":"2025-01-23T07:59:23.668Z"},
+  {"key":"ps_l","value":"1","domain":"facebook.com","path":"/","hostOnly":false,"creation":"2025-01-23T07:59:23.668Z","lastAccessed":"2025-01-23T07:59:23.668Z"},
+  {"key":"ps_n","value":"1","domain":"facebook.com","path":"/","hostOnly":false,"creation":"2025-01-23T07:59:23.668Z","lastAccessed":"2025-01-23T07:59:23.668Z"},
+  {"key":"datr","value":"_hO8ZrKKxAOagCc8Ek4hXbTZ","domain":"facebook.com","path":"/","hostOnly":false,"creation":"2025-01-23T07:59:23.668Z","lastAccessed":"2025-01-23T07:59:23.668Z"},
+  {"key":"dpr","value":"0.800000011920929","domain":"facebook.com","path":"/","hostOnly":false,"creation":"2025-01-23T07:59:23.668Z","lastAccessed":"2025-01-23T07:59:23.668Z"},
+  {"key":"locale","value":"en_US","domain":"facebook.com","path":"/","hostOnly":false,"creation":"2025-01-23T07:59:23.668Z","lastAccessed":"2025-01-23T07:59:23.668Z"},
+  {"key":"c_user","value":"100014474223301","domain":"facebook.com","path":"/","hostOnly":false,"creation":"2025-01-23T07:59:23.668Z","lastAccessed":"2025-01-23T07:59:23.668Z"},
+  {"key":"fr","value":"1vWrls4Y4y2nqSl4T.AWUqy8rQqiHhcWY4mlkq3pgG5qE.BnkemY..AAA.0.0.BnkemY.AWUb_CgRhRk","domain":"facebook.com","path":"/","hostOnly":false,"creation":"2025-01-23T07:59:23.668Z","lastAccessed":"2025-01-23T07:59:23.668Z"},
+  {"key":"xs","value":"15%3AKsl4d85MrKMRfA%3A2%3A1737606326%3A-1%3A3006%3A%3AAcV4DvwZjtVVoN5aLkd8ueZXIZFX4DjgtXS3wHl93Q","domain":"facebook.com","path":"/","hostOnly":false,"creation":"2025-01-23T07:59:23.668Z","lastAccessed":"2025-01-23T07:59:23.668Z"},
+  {"key":"wd","value":"1707x822","domain":"facebook.com","path":"/","hostOnly":false,"creation":"2025-01-23T07:59:23.668Z","lastAccessed":"2025-01-23T07:59:23.668Z"},
+  {"key":"presence","value":"C%7B%22t3%22%3A%5B%5D%2C%22utc3%22%3A1737618474523%2C%22v%22%3A1%7D","domain":"facebook.com","path":"/","hostOnly":false,"creation":"2025-01-23T07:59:23.668Z","lastAccessed":"2025-01-23T07:59:23.668Z"}
+];
 
-  // Validate the structure of each cookie
-  cookies.forEach(cookie => {
-    if (!cookie.key || !cookie.value || !cookie.domain || !cookie.path) {
-      throw new Error('Invalid cookie format. Each cookie must contain "key", "value", "domain", and "path".');
-    }
-  });
+// Convert cookies array to a string
+const cookiesString = cookies.map(cookie => `${cookie.key}=${cookie.value}`).join('; ');
 
-  const formattedCookies = cookies.map(cookie => ({
-    name: cookie.key,
-    value: cookie.value,
-    domain: cookie.domain,
-    path: cookie.path,
-    httpOnly: cookie.hostOnly === false,
-    secure: true,
-    sameSite: 'Lax',
-  }));
+const shareUrl = 'https://www.facebook.com/share/15dLqe5JCP/';
+let sharedCount = 0;
+const shareCount = 10;
+const timeInterval = 4000;
 
-  await page.setCookie(...formattedCookies);
-}
-
-// Function to simulate Facebook post sharing
-async function shareOnFacebook(postLink, fbstate) {
-  let browser;
+const sharePost = async () => {
   try {
-    browser = await puppeteer.launch({
-      headless: true, // Running in headless mode
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    });
-    const page = await browser.newPage();
-
-    // Set cookies
-    await setCookies(page, fbstate);
-
-    // Navigate to the post link with retry logic
-    let navigationSuccessful = false;
-    for (let i = 0; i < 3; i++) {
-      try {
-        await page.goto(postLink, { waitUntil: 'networkidle2', timeout: 180000 }); // Increase timeout
-        navigationSuccessful = true;
-        break;
-      } catch (error) {
-        logger.error(`Navigation attempt ${i + 1} failed: ${error}`);
+    // Make a request to the Facebook Graph API to share a post
+    const response = await c3cUtility.post(
+      'https://graph.facebook.com/me/feed',
+      {
+        link: shareUrl,
+        privacy: { value: 'SELF' },
+        no_story: true,
+      },
+      {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.97 Safari/537.36',
+          'Cookie': cookiesString
+        }
       }
+    );
+
+    sharedCount++;
+    console.log(`Post shared: ${sharedCount}`);
+
+    if (sharedCount === shareCount) {
+      clearInterval(timer);
+      console.log('Finished sharing posts.');
+      process.exit(0); // Exit the process once done
     }
-    if (!navigationSuccessful) {
-      throw new Error('Failed to navigate to the post link after multiple attempts');
-    }
-
-    // Wait for the page to load completely
-    await page.waitForNavigation({ waitUntil: 'networkidle0', timeout: 180000 });
-
-    // Wait for the share button to appear and be visible using XPath
-    await page.waitForXPath('//button[@name="share" or @data-testid="share_button"]', { timeout: 180000 });
-
-    // Click the share button using XPath
-    const [shareButton] = await page.$x('//button[@name="share" or @data-testid="share_button"]');
-    if (shareButton) {
-      await shareButton.click();
-    } else {
-      throw new Error('Share button not found');
-    }
-
-    // Wait for the post to be shared
-    await page.waitForTimeout(5000);
-
-    logger.info(`Successfully shared post: ${postLink}`);
-  } catch (err) {
-    logger.error('Error in shareOnFacebook:', err);
-    throw err;
-  } finally {
-    if (browser) {
-      await browser.close();
-    }
-  }
-}
-
-// API route to handle sharing requests
-app.post('/share', async (req, res) => {
-  const { fbstate, postLink, interval, shares } = req.body;
-
-  if (!fbstate || !postLink || !interval || !shares) {
-    return res.status(400).json({ message: 'Missing required parameters.' });
-  }
-
-  try {
-    const { error: insertError } = await supabase
-      .from('shares')
-      .insert([{ post_id: postLink, fb_cookie_id: 1, interval_seconds: interval, share_count: shares, status: 'Started', fbstate }]);
-
-    if (insertError) {
-      logger.error('Error inserting share log:', insertError);
-      return res.status(500).json({ message: 'Error inserting share log into database.' });
-    }
-
-    for (let i = 0; i < shares; i++) {
-      await shareOnFacebook(postLink, fbstate);
-      logger.info(`Shared ${i + 1} of ${shares}`);
-      await new Promise(resolve => setTimeout(resolve, interval * 1000));
-    }
-
-    const { error: updateError } = await supabase
-      .from('shares')
-      .update({ status: 'Completed' })
-      .eq('post_id', postLink);
-
-    if (updateError) {
-      logger.error('Error updating share status:', updateError);
-      return res.status(500).json({ message: 'Error updating share status.' });
-    }
-
-    res.json({ message: `Successfully shared ${shares} posts.` });
-  } catch (err) {
-    logger.error('Error during the sharing process:', err);
-    res.status(500).json({ message: 'Error occurred during the sharing process.' });
-  }
-});
-
-// Endpoint to generate Facebook share URL
-app.post('/generate-share-url', (req, res) => {
-  const { postLink } = req.body;
-
-  if (!postLink) {
-    return res.status(400).json({ message: 'Post link is required.' });
-  }
-
-  try {
-    const facebookShareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(postLink)}`;
-    res.json({ message: 'Share URL generated successfully.', shareUrl: facebookShareUrl });
   } catch (error) {
-    logger.error('Error generating share URL:', error);
-    res.status(500).json({ message: 'Error generating share URL.' });
+    console.error('Failed to share post:', error.response.data);
   }
-});
+};
 
-// Preflight OPTIONS requests
-app.options('*', cors());
+const timer = setInterval(sharePost, timeInterval);
 
-// Start the server
-app.listen(port, () => {
-  logger.info(`Server is running on port ${port}`);
-});
+// Start sharing immediately
+const startSharing = async () => {
+  await sharePost(); // Initial call
+  setInterval(sharePost, timeInterval); // Subsequent calls
+};
+
+startSharing();
