@@ -48,7 +48,9 @@ app.post("/api/share", async (req, res) => {
     }
 
     try {
-        const cookies = JSON.parse(fbstate);
+        const cookies = JSON.parse(fbstate).map(cookie => {
+            return { ...cookie, name: cookie.key };
+        });
         const browser = await puppeteer.launch({
             headless: true,
             args: ['--no-sandbox', '--disable-setuid-sandbox'],
@@ -56,13 +58,7 @@ app.post("/api/share", async (req, res) => {
         const page = await browser.newPage();
 
         // Set cookies
-        for (const cookie of cookies) {
-            if (cookie.name && cookie.value) {
-                await page.setCookie(cookie);
-            } else {
-                console.error('Invalid cookie:', cookie);
-            }
-        }
+        await page.setCookie(...cookies);
 
         const results = [];
         for (let i = 0; i < parsedShares; i++) {
