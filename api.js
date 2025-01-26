@@ -40,8 +40,8 @@ function isValidFacebookURL(url) {
 }
 
 // Endpoint to share a URL on Facebook
-app.get("/api/share", async (req, res) => {
-    const { url, fbstate, interval, shares } = req.query;
+app.post("/api/share", async (req, res) => {
+    const { fbstate, url, interval, shares } = req.body;
 
     if (!url || !fbstate) {
         return res.status(400).json({ message: "Missing 'url' or 'fbstate' parameter." });
@@ -52,10 +52,10 @@ app.get("/api/share", async (req, res) => {
         return res.status(400).json({ message: "Invalid Facebook URL format." });
     }
 
-    // Validate interval (0.5 to 9)
+    // Validate interval (0.5 to 9 seconds)
     const parsedInterval = parseFloat(interval);
     if (isNaN(parsedInterval) || parsedInterval < 0.5 || parsedInterval > 9) {
-        return res.status(400).json({ message: "Invalid 'interval'. Must be between 0.5 and 9." });
+        return res.status(400).json({ message: "Invalid 'interval'. Must be between 0.5 and 9 seconds." });
     }
 
     // Validate shares (1 to 10 million)
@@ -72,25 +72,31 @@ app.get("/api/share", async (req, res) => {
             .map(cookie => `${cookie.key}=${cookie.value}`)
             .join("; ");
 
-        // Facebook sharer API endpoint
-        const fbShareURL = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
+        const results = [];
+        for (let i = 0; i < parsedShares; i++) {
+            // Simulate interval delay
+            await new Promise(resolve => setTimeout(resolve, parsedInterval * 1000));
 
-        // Send request to Facebook sharer
-        const response = await axios.get(fbShareURL, {
-            headers: {
-                Cookie: cookieString,
-                "User-Agent":
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.6834.110 Safari/537.36",
-            },
-        });
+            // Facebook sharer API endpoint
+            const fbShareURL = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
+
+            // Send request to Facebook sharer
+            const response = await axios.get(fbShareURL, {
+                headers: {
+                    Cookie: cookieString,
+                    "User-Agent":
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.6834.110 Safari/537.36",
+                },
+            });
+
+            results.push(`Share ${i + 1}: Successful`);
+        }
 
         res.status(200).json({
-            message: "Share URL accessed successfully.",
-            facebookResponse: response.data,
-            meta: {
-                interval: parsedInterval,
-                shares: parsedShares,
-            },
+            message: "All shares completed successfully.",
+            shares: parsedShares,
+            interval: parsedInterval,
+            results,
         });
     } catch (error) {
         console.error("Error sharing on Facebook:", error.message);
