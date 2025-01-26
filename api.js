@@ -6,8 +6,8 @@ const axios = require("axios");
 
 const app = express();
 
-// Enable CORS for all origins (or specify allowed origins)
-app.use(cors());  // This line enables CORS for all origins
+// Enable CORS for all origins
+app.use(cors());  // Apply the CORS middleware globally
 app.use(cookieParser());
 app.use(bodyParser.json());
 
@@ -16,31 +16,11 @@ app.get("/", (req, res) => {
     res.send({ message: "Facebook Sharing API is running!" });
 });
 
-// Endpoint to set cookies dynamically
-app.post("/api/set-cookies", (req, res) => {
-    const { cookies } = req.body;
-
-    if (!Array.isArray(cookies)) {
-        return res.status(400).json({ message: "Invalid cookies format. Must be an array." });
-    }
-
-    cookies.forEach(cookie => {
-        res.cookie(cookie.key, cookie.value, {
-            domain: cookie.domain || "facebook.com",
-            path: cookie.path || "/",
-            httpOnly: cookie.hostOnly === false,
-            secure: true,
-            sameSite: "Lax",
-        });
-    });
-
-    res.status(200).json({ message: "Cookies set successfully." });
-});
-
-// Helper function to validate Facebook URLs
+// Helper function to validate Facebook URLs (both post and share)
 function isValidFacebookURL(url) {
-    const regex = /^https:\/\/www\.facebook\.com\/(share\/p|[0-9]+\/posts)\/.+$/;
-    return regex.test(url);
+    const postRegex = /^https:\/\/www\.facebook\.com\/[0-9]+\/posts\/.+$/;
+    const shareRegex = /^https:\/\/www\.facebook\.com\/share\/p\/.+$/;
+    return postRegex.test(url) || shareRegex.test(url);
 }
 
 // Endpoint to share a URL on Facebook
@@ -53,7 +33,7 @@ app.post("/api/share", async (req, res) => {
 
     // Validate Facebook URL
     if (!isValidFacebookURL(url)) {
-        return res.status(400).json({ message: "Invalid Facebook URL format." });
+        return res.status(400).json({ message: "Invalid Facebook URL format. Please use a valid post or share URL." });
     }
 
     // Validate interval (0.5 to 9 seconds)
@@ -81,8 +61,11 @@ app.post("/api/share", async (req, res) => {
             // Simulate interval delay
             await new Promise(resolve => setTimeout(resolve, parsedInterval * 1000));
 
+            // Encode the URL for Facebook's sharer endpoint
+            const encodedURL = encodeURIComponent(url);
+
             // Facebook sharer API endpoint
-            const fbShareURL = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
+            const fbShareURL = `https://www.facebook.com/sharer/sharer.php?u=${encodedURL}`;
 
             // Send request to Facebook sharer
             const response = await axios.get(fbShareURL, {
