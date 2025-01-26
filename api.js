@@ -49,7 +49,10 @@ app.post("/api/share", async (req, res) => {
 
     try {
         const cookies = JSON.parse(fbstate);
-        const browser = await puppeteer.launch();
+        const browser = await puppeteer.launch({
+            headless: true,
+            args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        });
         const page = await browser.newPage();
 
         // Set cookies
