@@ -25,6 +25,11 @@ function isValidFacebookURL(url) {
     return postRegex.test(url) || shareRegex.test(url) || extendedPostRegex.test(url) || extendedShareRegex.test(url);
 }
 
+// Helper function to delay execution
+function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 // Endpoint to share a URL on Facebook using Puppeteer
 app.post("/api/share", async (req, res) => {
     const { fbstate, url, interval, shares } = req.body;
@@ -64,18 +69,23 @@ app.post("/api/share", async (req, res) => {
 
         const results = [];
         for (let i = 0; i < parsedShares; i++) {
-            await new Promise(resolve => setTimeout(resolve, parsedInterval * 1000));
+            await delay(parsedInterval * 1000);
 
             const encodedURL = encodeURIComponent(url);
             const fbShareURL = `https://www.facebook.com/sharer/sharer.php?u=${encodedURL}`;
 
-            await page.goto(fbShareURL, { timeout: 60000 });  // Increase timeout to 60 seconds
-            await page.waitForNavigation();  // Wait for navigation to complete
+            try {
+                await page.goto(fbShareURL, { timeout: 60000 });  // Increase timeout to 60 seconds
+                await page.waitForNavigation();  // Wait for navigation to complete
 
-            // Additional steps might be required here to actually perform the share operation
-            // depending on the interactions required by Facebook's interface.
+                // Additional steps might be required here to actually perform the share operation
+                // depending on the interactions required by Facebook's interface.
 
-            results.push(`Share ${i + 1}: Attempted`);
+                results.push(`Share ${i + 1}: Attempted`);
+            } catch (error) {
+                console.error(`Error on share ${i + 1}:`, error.message);
+                results.push(`Share ${i + 1}: Failed - ${error.message}`);
+            }
         }
 
         await browser.close();
@@ -87,8 +97,8 @@ app.post("/api/share", async (req, res) => {
             results,
         });
     } catch (error) {
-        console.error("Error:", error.message);
-        res.status(500).json({ message: "Internal server error.", error: error.message });
+        console.error("Error sharing on Facebook:", error.message);
+        res.status(500).json({ message: "Failed to share on Facebook.", error: error.message });
     }
 });
 
