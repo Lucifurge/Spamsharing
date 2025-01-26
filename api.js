@@ -57,8 +57,10 @@ app.post("/api/share", async (req, res) => {
         });
         const page = await browser.newPage();
 
-        // Set cookies
+        // Set cookies and wait for navigation to complete
         await page.setCookie(...cookies);
+        await page.goto('https://facebook.com');  // Initial navigation to set cookies
+        await page.waitForNavigation();
 
         const results = [];
         for (let i = 0; i < parsedShares; i++) {
@@ -67,7 +69,8 @@ app.post("/api/share", async (req, res) => {
             const encodedURL = encodeURIComponent(url);
             const fbShareURL = `https://www.facebook.com/sharer/sharer.php?u=${encodedURL}`;
 
-            await page.goto(fbShareURL);
+            await page.goto(fbShareURL, { timeout: 60000 });  // Increase timeout to 60 seconds
+            await page.waitForNavigation();  // Wait for navigation to complete
 
             // Additional steps might be required here to actually perform the share operation
             // depending on the interactions required by Facebook's interface.
