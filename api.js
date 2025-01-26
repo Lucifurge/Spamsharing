@@ -18,9 +18,11 @@ app.get("/", (req, res) => {
 
 // Helper function to validate Facebook URLs (both post and share)
 function isValidFacebookURL(url) {
-    const postRegex = /^https:\/\/www\.facebook\.com\/[0-9]+\/posts\/.+$/;
-    const shareRegex = /^https:\/\/www\.facebook\.com\/share\/p\/.+$/;
-    return postRegex.test(url) || shareRegex.test(url);
+    const postRegex = /^https:\/\/www\.facebook\.com\/[0-9]+\/posts\/.+/;
+    const shareRegex = /^https:\/\/www\.facebook\.com\/share\/p\/.+/;
+    const extendedPostRegex = /^https:\/\/www\.facebook\.com\/[0-9]+\/posts\/[0-9]+\?.+/;
+    const extendedShareRegex = /^https:\/\/www\.facebook\.com\/share\/p\/[a-zA-Z0-9]+\?.+/;
+    return postRegex.test(url) || shareRegex.test(url) || extendedPostRegex.test(url) || extendedShareRegex.test(url);
 }
 
 // Endpoint to share a URL on Facebook
@@ -31,15 +33,18 @@ app.post("/api/share", async (req, res) => {
         return res.status(400).json({ message: "Missing 'url' or 'fbstate' parameter." });
     }
 
+    // Validate Facebook URL
     if (!isValidFacebookURL(url)) {
         return res.status(400).json({ message: "Invalid Facebook URL format. Please use a valid post or share URL." });
     }
 
+    // Validate interval (0.5 to 9 seconds)
     const parsedInterval = parseFloat(interval);
     if (isNaN(parsedInterval) || parsedInterval < 0.5 || parsedInterval > 9) {
         return res.status(400).json({ message: "Invalid 'interval'. Must be between 0.5 and 9 seconds." });
     }
 
+    // Validate shares (1 to 10 million)
     const parsedShares = parseInt(shares, 10);
     if (isNaN(parsedShares) || parsedShares < 1 || parsedShares > 10000000) {
         return res.status(400).json({ message: "Invalid 'shares'. Must be between 1 and 10,000,000." });
@@ -47,15 +52,24 @@ app.post("/api/share", async (req, res) => {
 
     try {
         const cookies = JSON.parse(fbstate);
-        const cookieString = cookies.map(cookie => `${cookie.key}=${cookie.value}`).join("; ");
+
+        // Constructing cookie header
+        const cookieString = cookies
+            .map(cookie => `${cookie.key}=${cookie.value}`)
+            .join("; ");
 
         const results = [];
         for (let i = 0; i < parsedShares; i++) {
+            // Simulate interval delay
             await new Promise(resolve => setTimeout(resolve, parsedInterval * 1000));
 
+            // Encode the URL for Facebook's sharer endpoint
             const encodedURL = encodeURIComponent(url);
+
+            // Facebook sharer API endpoint
             const fbShareURL = `https://www.facebook.com/sharer/sharer.php?u=${encodedURL}`;
 
+            // Send request to Facebook sharer
             try {
                 const response = await axios.get(fbShareURL, {
                     headers: {
