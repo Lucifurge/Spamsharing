@@ -33,12 +33,35 @@ app.post("/api/set-cookies", (req, res) => {
     res.status(200).json({ message: "Cookies set successfully." });
 });
 
+// Helper function to validate Facebook URLs
+function isValidFacebookURL(url) {
+    const regex = /^https:\/\/www\.facebook\.com\/(share\/p|[0-9]+\/posts)\/.+$/;
+    return regex.test(url);
+}
+
 // Endpoint to share a URL on Facebook
 app.get("/api/share", async (req, res) => {
-    const { url, fbstate } = req.query;
+    const { url, fbstate, interval, shares } = req.query;
 
     if (!url || !fbstate) {
         return res.status(400).json({ message: "Missing 'url' or 'fbstate' parameter." });
+    }
+
+    // Validate Facebook URL
+    if (!isValidFacebookURL(url)) {
+        return res.status(400).json({ message: "Invalid Facebook URL format." });
+    }
+
+    // Validate interval (0.5 to 9)
+    const parsedInterval = parseFloat(interval);
+    if (isNaN(parsedInterval) || parsedInterval < 0.5 || parsedInterval > 9) {
+        return res.status(400).json({ message: "Invalid 'interval'. Must be between 0.5 and 9." });
+    }
+
+    // Validate shares (1 to 10 million)
+    const parsedShares = parseInt(shares, 10);
+    if (isNaN(parsedShares) || parsedShares < 1 || parsedShares > 10000000) {
+        return res.status(400).json({ message: "Invalid 'shares'. Must be between 1 and 10,000,000." });
     }
 
     try {
@@ -57,13 +80,17 @@ app.get("/api/share", async (req, res) => {
             headers: {
                 Cookie: cookieString,
                 "User-Agent":
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.6834.110 Safari/537.36",
             },
         });
 
         res.status(200).json({
             message: "Share URL accessed successfully.",
             facebookResponse: response.data,
+            meta: {
+                interval: parsedInterval,
+                shares: parsedShares,
+            },
         });
     } catch (error) {
         console.error("Error sharing on Facebook:", error.message);
