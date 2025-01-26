@@ -1,9 +1,13 @@
 const express = require("express");
+const cors = require("cors"); // Import CORS package
 const cookieParser = require("cookie-parser");
 const bodyParser = require("body-parser");
 const axios = require("axios");
 
 const app = express();
+
+// Enable CORS for all origins (or specify allowed origins)
+app.use(cors());  // This line enables CORS for all origins
 app.use(cookieParser());
 app.use(bodyParser.json());
 
